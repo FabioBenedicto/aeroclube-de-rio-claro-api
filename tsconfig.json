@@ -16,9 +16,6 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false,
-    "paths": {
-      "@prisma/client/runtime/library": ["node_modules/@prisma/client-runtime-utils/dist/index.d.ts"]
-    }
+    "noFallthroughCasesInSwitch": false
   }
 }

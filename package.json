@@ -82,9 +82,6 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node",
-    "moduleNameMapper": {
-      "^@prisma/client/runtime/library$": "@prisma/client-runtime-utils"
-    }
+    "testEnvironment": "node"
   }
 }

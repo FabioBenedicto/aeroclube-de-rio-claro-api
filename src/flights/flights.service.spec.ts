@@ -3,7 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 import { FlightsRepository } from './flights.repository';
 import { PrismaService } from '../prisma/prisma.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client-runtime-utils';
 
 const mockPlane = {
   id: 1,

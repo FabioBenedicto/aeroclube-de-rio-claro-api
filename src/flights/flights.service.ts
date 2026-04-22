@@ -3,7 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client-runtime-utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { FlightsRepository } from './flights.repository';
 import { CreateFlightDto } from './dto/create-flight.dto';
