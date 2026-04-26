@@ -1,5 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { CustomersRepository } from './customers.repository';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -42,20 +45,21 @@ export class CustomersService {
   }
 
   async create(dto: CreateCustomerDto) {
-    try {
-      const c = await this.repo.create({
-        cpf: dto.cpf,
-        name: dto.name,
-        email: dto.email,
-        phone_number: dto.phone_number,
-        flight_hour_balance: dto.flight_hour_balance ?? 0,
-      });
+    if (await this.repo.findByCpf(dto.cpf))
+      throw new ConflictException('CPF já cadastrado');
 
-      return withCategories(c);
-    } catch (err) {
-      this.handleUniqueViolation(err);
-      throw err;
-    }
+    if (await this.repo.findByEmail(dto.email))
+      throw new ConflictException('E-mail já cadastrado');
+
+    const c = await this.repo.create({
+      cpf: dto.cpf,
+      name: dto.name,
+      email: dto.email,
+      phone_number: dto.phone_number,
+      flight_hour_balance: dto.flight_hour_balance ?? 0,
+    });
+
+    return withCategories(c);
   }
 
   async update(id: number, dto: UpdateCustomerDto) {
@@ -65,24 +69,10 @@ export class CustomersService {
       throw new NotFoundException(`Cliente ${id} não encontrado`);
     }
 
-    try {
-      const updatedCustomer = await this.repo.update(id, dto);
-      return withCategories(updatedCustomer);
-    } catch (err) {
-      this.handleUniqueViolation(err);
-      throw err;
-    }
-  }
+    if (dto.email && (await this.repo.findByEmail(dto.email, id)))
+      throw new ConflictException('E-mail já cadastrado');
 
-  private handleUniqueViolation(err: unknown): void {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === 'P2002'
-    ) {
-      const fields = (err.meta?.target as string[]) ?? [];
-      if (fields.includes('cpf')) throw new ConflictException('CPF já cadastrado');
-      if (fields.includes('email')) throw new ConflictException('E-mail já cadastrado');
-      throw new ConflictException('Dado duplicado');
-    }
+    const updatedCustomer = await this.repo.update(id, dto);
+    return withCategories(updatedCustomer);
   }
 }

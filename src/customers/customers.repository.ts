@@ -41,6 +41,16 @@ export class CustomersRepository {
     });
   }
 
+  findByCpf(cpf: string) {
+    return this.prisma.customer.findUnique({ where: { cpf } });
+  }
+
+  findByEmail(email: string, excludeId?: number) {
+    return this.prisma.customer.findFirst({
+      where: { email, ...(excludeId && { NOT: { id: excludeId } }) },
+    });
+  }
+
   create(data: Prisma.CustomerCreateInput) {
     return this.prisma.customer.create({
       data,
