@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { jwtConfig } from './config/jwt.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { FlightsModule } from './flights/flights.module';
@@ -13,7 +14,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, load: [jwtConfig] }),
     PrismaModule,
     AuthModule,
     FlightsModule,
