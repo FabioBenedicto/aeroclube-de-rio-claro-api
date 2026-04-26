@@ -8,6 +8,14 @@ type Tx = Prisma.TransactionClient;
 export class ReceivablesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findAll(status?: string) {
+    return this.prisma.receivable.findMany({
+      where: status !== undefined ? { status: Number(status) } : undefined,
+      orderBy: { created_at: 'desc' },
+      include: { customer: true, flight: { include: { plane: true } } },
+    });
+  }
+
   async findById(id: number, tx?: Tx) {
     const client: Tx = tx ?? this.prisma;
     return client.receivable.findUnique({

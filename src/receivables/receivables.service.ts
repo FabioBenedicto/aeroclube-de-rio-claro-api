@@ -73,4 +73,12 @@ export class ReceivablesService {
       };
     });
   }
+
+  findAll(status?: string) { return this.receivablesRepository.findAll(status); }
+
+  async findOne(id: number) {
+    const r = await this.receivablesRepository.findById(id);
+    if (!r) throw new NotFoundException(`Título ${id} não encontrado`);
+    return r;
+  }
 }

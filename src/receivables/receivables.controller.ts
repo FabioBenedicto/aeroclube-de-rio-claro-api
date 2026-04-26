@@ -1,8 +1,10 @@
 import {
   Controller,
+  Get,
   Post,
   Param,
   Body,
+  Query,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -20,6 +22,14 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 @Controller('receivables')
 export class ReceivablesController {
   constructor(private readonly receivablesService: ReceivablesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar títulos a receber' })
+  findAll(@Query('status') status?: string) { return this.receivablesService.findAll(status); }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Detalhes do título' })
+  findOne(@Param('id', ParseIntPipe) id: number) { return this.receivablesService.findOne(id); }
 
   @Post(':id/payments')
   @Roles(Role.ADMIN, Role.EMPLOYEE)
