@@ -45,17 +45,20 @@ export class CustomersService {
   }
 
   async create(dto: CreateCustomerDto) {
-    if (await this.repo.findByCpf(dto.cpf))
-      throw new ConflictException('CPF já cadastrado');
+    const cpfAlreadyExists = await this.repo.findByCpf(dto.cpf);
 
-    if (await this.repo.findByEmail(dto.email))
+    if (cpfAlreadyExists) {
+      throw new ConflictException('CPF já cadastrado');
+    }
+
+    const emailAlreadyExists = await this.repo.findByEmail(dto.email);
+
+    if (emailAlreadyExists) {
       throw new ConflictException('E-mail já cadastrado');
+    }
 
     const c = await this.repo.create({
-      cpf: dto.cpf,
-      name: dto.name,
-      email: dto.email,
-      phone_number: dto.phone_number,
+      ...dto,
       flight_hour_balance: dto.flight_hour_balance ?? 0,
     });
 
@@ -69,8 +72,11 @@ export class CustomersService {
       throw new NotFoundException(`Cliente ${id} não encontrado`);
     }
 
-    if (dto.email && (await this.repo.findByEmail(dto.email, id)))
-      throw new ConflictException('E-mail já cadastrado');
+    if (dto.email) {
+      const existing = await this.repo.findByEmail(dto.email);
+      if (existing && existing.id !== id)
+        throw new ConflictException('E-mail já cadastrado');
+    }
 
     const updatedCustomer = await this.repo.update(id, dto);
     return withCategories(updatedCustomer);

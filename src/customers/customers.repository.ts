@@ -45,10 +45,8 @@ export class CustomersRepository {
     return this.prisma.customer.findUnique({ where: { cpf } });
   }
 
-  findByEmail(email: string, excludeId?: number) {
-    return this.prisma.customer.findFirst({
-      where: { email, ...(excludeId && { NOT: { id: excludeId } }) },
-    });
+  findByEmail(email: string) {
+    return this.prisma.customer.findUnique({ where: { email } });
   }
 
   create(data: Prisma.CustomerCreateInput) {
