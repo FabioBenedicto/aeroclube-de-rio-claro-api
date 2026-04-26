@@ -81,7 +81,9 @@ describe('FlightsService', () => {
   it('throws NotFoundException for unknown plane', async () => {
     mockPrisma.plane.findUnique.mockResolvedValue(null);
 
-    await expect(service.registerFlight(baseDto)).rejects.toThrow(NotFoundException);
+    await expect(service.registerFlight(baseDto)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('throws BadRequestException when double_command has no instructor', async () => {

@@ -30,4 +30,23 @@ export class FlightsRepository {
     const client: Tx = (tx ?? this.prisma) as Tx;
     return client.payableInstallment.create({ data });
   }
+
+  async findAll(status?: string) {
+    return this.prisma.flight.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { start_date: 'desc' },
+      include: { plane: true, customer: true, instructor: { include: { customer: true } } },
+    });
+  }
+
+  async findById(id: number) {
+    return this.prisma.flight.findUnique({
+      where: { id },
+      include: { plane: true, customer: true, instructor: { include: { customer: true } }, receivables: true },
+    });
+  }
+
+  async updateFlight(id: number, data: Prisma.FlightUpdateInput) {
+    return this.prisma.flight.update({ where: { id }, data });
+  }
 }

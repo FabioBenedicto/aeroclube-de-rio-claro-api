@@ -16,9 +16,13 @@ export class FlightsService {
   ) {}
 
   async registerFlight(dto: CreateFlightDto) {
-    const plane = await this.prisma.plane.findUnique({ where: { id: dto.plane_id } });
-    if (!plane) throw new NotFoundException(`Aeronave ${dto.plane_id} não encontrada`);
-    if (plane.status !== 'active') throw new BadRequestException('Aeronave não está ativa');
+    const plane = await this.prisma.plane.findUnique({
+      where: { id: dto.plane_id },
+    });
+    if (!plane)
+      throw new NotFoundException(`Aeronave ${dto.plane_id} não encontrada`);
+    if (plane.status !== 'active')
+      throw new BadRequestException('Aeronave não está ativa');
     if (dto.double_command && !dto.instructor_id) {
       throw new BadRequestException('Duplo comando requer instructor_id');
     }
@@ -40,7 +44,9 @@ export class FlightsService {
         {
           plane: { connect: { id: dto.plane_id } },
           customer: { connect: { id: dto.customer_id } },
-          ...(dto.instructor_id && { instructor: { connect: { id: dto.instructor_id } } }),
+          ...(dto.instructor_id && {
+            instructor: { connect: { id: dto.instructor_id } },
+          }),
           type: dto.type,
           double_command: dto.double_command,
           origin: dto.origin,
@@ -98,5 +104,32 @@ export class FlightsService {
 
       return flight;
     });
+  }
+
+  findAll(status?: string) {
+    return this.flightsRepository.findAll(status);
+  }
+
+  async findOne(id: number) {
+    const f = await this.flightsRepository.findById(id);
+    if (!f) throw new NotFoundException(`Voo ${id} não encontrado`);
+    return f;
+  }
+
+  async closeFlight(id: number, endDateIso: string) {
+    const flight = await this.findOne(id);
+    if (flight.status !== 'in-flight') throw new BadRequestException('Voo já está encerrado ou cancelado');
+    const endDate = new Date(endDateIso);
+    const diffHours = (endDate.getTime() - flight.start_date.getTime()) / 3_600_000;
+    const totalHours = new Decimal(diffHours.toFixed(2));
+    const plane = await this.prisma.plane.findUnique({ where: { id: flight.plane_id } });
+    const totalAmount = plane!.flight_hour_value.mul(totalHours);
+    return this.flightsRepository.updateFlight(id, { end_date: endDate, total_hours: totalHours, total_amount: totalAmount, status: 'closed' });
+  }
+
+  async cancelFlight(id: number) {
+    const flight = await this.findOne(id);
+    if (flight.status === 'cancelled') throw new BadRequestException('Voo já está cancelado');
+    return this.flightsRepository.updateFlight(id, { status: 'cancelled' });
   }
 }
