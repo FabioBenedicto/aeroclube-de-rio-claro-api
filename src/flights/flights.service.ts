@@ -1,28 +1,16 @@
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client-runtime-utils';
-import { PrismaService } from '../prisma/prisma.service';
 import { FlightsRepository } from './flights.repository';
 import { CreateFlightDto } from './dto/create-flight.dto';
 
 @Injectable()
 export class FlightsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly flightsRepository: FlightsRepository,
-  ) {}
+  constructor(private readonly flightsRepository: FlightsRepository) {}
 
   async registerFlight(dto: CreateFlightDto) {
-    const plane = await this.prisma.plane.findUnique({
-      where: { id: dto.plane_id },
-    });
-    if (!plane)
-      throw new NotFoundException(`Aeronave ${dto.plane_id} não encontrada`);
-    if (plane.status !== 'active')
-      throw new BadRequestException('Aeronave não está ativa');
+    const plane = await this.flightsRepository.findPlane(dto.plane_id);
+    if (!plane) throw new NotFoundException(`Aeronave ${dto.plane_id} não encontrada`);
+    if (plane.status !== 'active') throw new BadRequestException('Aeronave não está ativa');
     if (dto.double_command && !dto.instructor_id) {
       throw new BadRequestException('Duplo comando requer instructor_id');
     }
@@ -39,70 +27,52 @@ export class FlightsService {
       totalAmount = plane.flight_hour_value.mul(totalHours);
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const flight = await this.flightsRepository.createFlight(
-        {
-          plane: { connect: { id: dto.plane_id } },
-          customer: { connect: { id: dto.customer_id } },
-          ...(dto.instructor_id && {
-            instructor: { connect: { id: dto.instructor_id } },
-          }),
-          type: dto.type,
-          double_command: dto.double_command,
-          origin: dto.origin,
-          destination: dto.destination,
-          start_date: startDate,
-          ...(endDate && { end_date: endDate }),
-          ...(totalHours !== undefined && { total_hours: totalHours }),
-          ...(totalAmount !== undefined && { total_amount: totalAmount }),
-        },
-        tx,
-      );
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 30);
 
-      if (totalAmount) {
-        const expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() + 30);
-
-        await this.flightsRepository.createReceivable(
-          {
+    return this.flightsRepository.registerFlight({
+      flightData: {
+        plane: { connect: { id: dto.plane_id } },
+        customer: { connect: { id: dto.customer_id } },
+        ...(dto.instructor_id && { instructor: { connect: { id: dto.instructor_id } } }),
+        type: dto.type,
+        double_command: dto.double_command,
+        origin: dto.origin,
+        destination: dto.destination,
+        start_date: startDate,
+        ...(endDate && { end_date: endDate }),
+        ...(totalHours !== undefined && { total_hours: totalHours }),
+        ...(totalAmount !== undefined && { total_amount: totalAmount }),
+      },
+      buildReceivable: totalAmount
+        ? (flightId) => ({
             customer: { connect: { id: dto.customer_id } },
-            flight: { connect: { id: flight.id } },
-            title: `Voo ${dto.type.toUpperCase()} #${flight.id}`,
+            flight: { connect: { id: flightId } },
+            title: `Voo ${dto.type.toUpperCase()} #${flightId}`,
             description: `${dto.origin} → ${dto.destination}`,
             expiration_date: expirationDate,
-            total_amount: totalAmount,
+            total_amount: totalAmount!,
             product: 'hora_voo',
-          },
-          tx,
-        );
-
-        if (dto.double_command && dto.instructor_id) {
-          const payable = await this.flightsRepository.createPayable(
-            {
-              instructor: { connect: { id: dto.instructor_id } },
-              title: `Instrução voo #${flight.id}`,
+          })
+        : undefined,
+      buildPayable: dto.double_command && dto.instructor_id && totalAmount
+        ? (flightId) => ({
+            payableData: {
+              instructor: { connect: { id: dto.instructor_id! } },
+              title: `Instrução voo #${flightId}`,
               description: `Duplo comando — ${dto.origin} → ${dto.destination}`,
-              total_amount: totalAmount,
+              total_amount: totalAmount!,
               installments_count: 1,
               product: 'instrucao',
               expiration_date: expirationDate,
             },
-            tx,
-          );
-
-          await this.flightsRepository.createPayableInstallment(
-            {
-              payable: { connect: { id: payable.id } },
+            installmentData: {
               installment_number: 1,
-              amount: totalAmount,
+              amount: totalAmount!,
               expiration_date: expirationDate,
             },
-            tx,
-          );
-        }
-      }
-
-      return flight;
+          })
+        : undefined,
     });
   }
 
@@ -122,9 +92,14 @@ export class FlightsService {
     const endDate = new Date(endDateIso);
     const diffHours = (endDate.getTime() - flight.start_date.getTime()) / 3_600_000;
     const totalHours = new Decimal(diffHours.toFixed(2));
-    const plane = await this.prisma.plane.findUnique({ where: { id: flight.plane_id } });
+    const plane = await this.flightsRepository.findPlane(flight.plane_id);
     const totalAmount = plane!.flight_hour_value.mul(totalHours);
-    return this.flightsRepository.updateFlight(id, { end_date: endDate, total_hours: totalHours, total_amount: totalAmount, status: 'closed' });
+    return this.flightsRepository.updateFlight(id, {
+      end_date: endDate,
+      total_hours: totalHours,
+      total_amount: totalAmount,
+      status: 'closed',
+    });
   }
 
   async cancelFlight(id: number) {

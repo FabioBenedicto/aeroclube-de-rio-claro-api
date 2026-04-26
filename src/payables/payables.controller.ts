@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PayablesService, CreatePayablePaymentDto } from './payables.service';
@@ -12,16 +21,22 @@ export class PayablesController {
 
   @Get()
   @ApiOperation({ summary: 'Listar títulos a pagar' })
-  findAll(@Query('status') status?: string) { return this.payablesService.findAll(status); }
+  findAll(@Query('status') status?: string) {
+    return this.payablesService.findAll(status);
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detalhes do título a pagar' })
-  findOne(@Param('id', ParseIntPipe) id: number) { return this.payablesService.findOne(id); }
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.payablesService.findOne(id);
+  }
 
   @Post(':id/payments')
   @ApiOperation({ summary: 'Registrar pagamento de parcela' })
   registerPayment(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreatePayablePaymentDto,
-  ) { return this.payablesService.registerPayment(id, dto); }
+  ) {
+    return this.payablesService.registerPayment(id, dto);
+  }
 }

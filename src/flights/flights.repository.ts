@@ -1,37 +1,49 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client-runtime-utils';
 
-type Tx = Prisma.TransactionClient;
+interface RegisterFlightInput {
+  flightData: Prisma.FlightCreateInput;
+  buildReceivable?: (flightId: number) => Prisma.ReceivableCreateInput;
+  buildPayable?: (flightId: number) => {
+    payableData: Prisma.PayableCreateInput;
+    installmentData: { installment_number: number; amount: Decimal; expiration_date: Date };
+  };
+}
 
 @Injectable()
 export class FlightsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createFlight(data: Prisma.FlightCreateInput, tx?: Tx) {
-    const client: Tx = (tx ?? this.prisma) as Tx;
-    return client.flight.create({
-      data,
-      include: { plane: true, customer: true, instructor: true },
+  async registerFlight(input: RegisterFlightInput) {
+    return this.prisma.$transaction(async (tx) => {
+      const flight = await tx.flight.create({
+        data: input.flightData,
+        include: { plane: true, customer: true, instructor: true },
+      });
+
+      if (input.buildReceivable) {
+        await tx.receivable.create({ data: input.buildReceivable(flight.id) });
+      }
+
+      if (input.buildPayable) {
+        const { payableData, installmentData } = input.buildPayable(flight.id);
+        const payable = await tx.payable.create({ data: payableData });
+        await tx.payableInstallment.create({
+          data: { payable: { connect: { id: payable.id } }, ...installmentData },
+        });
+      }
+
+      return flight;
     });
   }
 
-  async createReceivable(data: Prisma.ReceivableCreateInput, tx?: Tx) {
-    const client: Tx = (tx ?? this.prisma) as Tx;
-    return client.receivable.create({ data });
+  findPlane(id: number) {
+    return this.prisma.plane.findUnique({ where: { id } });
   }
 
-  async createPayable(data: Prisma.PayableCreateInput, tx?: Tx) {
-    const client: Tx = (tx ?? this.prisma) as Tx;
-    return client.payable.create({ data });
-  }
-
-  async createPayableInstallment(data: Prisma.PayableInstallmentCreateInput, tx?: Tx) {
-    const client: Tx = (tx ?? this.prisma) as Tx;
-    return client.payableInstallment.create({ data });
-  }
-
-  async findAll(status?: string) {
+  findAll(status?: string) {
     return this.prisma.flight.findMany({
       where: status ? { status } : undefined,
       orderBy: { start_date: 'desc' },
@@ -39,14 +51,14 @@ export class FlightsRepository {
     });
   }
 
-  async findById(id: number) {
+  findById(id: number) {
     return this.prisma.flight.findUnique({
       where: { id },
       include: { plane: true, customer: true, instructor: { include: { customer: true } }, receivables: true },
     });
   }
 
-  async updateFlight(id: number, data: Prisma.FlightUpdateInput) {
+  updateFlight(id: number, data: Prisma.FlightUpdateInput) {
     return this.prisma.flight.update({ where: { id }, data });
   }
 }

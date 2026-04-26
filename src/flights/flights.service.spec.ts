@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 import { FlightsRepository } from './flights.repository';
-import { PrismaService } from '../prisma/prisma.service';
 import { Decimal } from '@prisma/client-runtime-utils';
 
 const mockPlane = {
@@ -13,18 +12,14 @@ const mockPlane = {
   status: 'active',
 };
 
-const mockFlight = { id: 1, plane_id: 1, customer_id: 10 };
-
-const mockPrisma = {
-  plane: { findUnique: jest.fn() },
-  $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => cb({})),
-};
+const mockFlight = { id: 42, plane_id: 1, customer_id: 10 };
 
 const mockRepo = {
-  createFlight: jest.fn(),
-  createReceivable: jest.fn(),
-  createPayable: jest.fn(),
-  createPayableInstallment: jest.fn(),
+  findPlane: jest.fn(),
+  registerFlight: jest.fn(),
+  findAll: jest.fn(),
+  findById: jest.fn(),
+  updateFlight: jest.fn(),
 };
 
 describe('FlightsService', () => {
@@ -34,16 +29,14 @@ describe('FlightsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FlightsService,
-        { provide: PrismaService, useValue: mockPrisma },
         { provide: FlightsRepository, useValue: mockRepo },
       ],
     }).compile();
 
     service = module.get<FlightsService>(FlightsService);
     jest.clearAllMocks();
-    mockPrisma.plane.findUnique.mockResolvedValue(mockPlane);
-    mockRepo.createFlight.mockResolvedValue(mockFlight);
-    mockRepo.createPayable.mockResolvedValue({ id: 99 });
+    mockRepo.findPlane.mockResolvedValue(mockPlane);
+    mockRepo.registerFlight.mockResolvedValue(mockFlight);
   });
 
   const baseDto = {
@@ -60,9 +53,19 @@ describe('FlightsService', () => {
   it('creates flight and receivable for solo flight', async () => {
     await service.registerFlight(baseDto);
 
-    expect(mockRepo.createFlight).toHaveBeenCalledTimes(1);
-    expect(mockRepo.createReceivable).toHaveBeenCalledTimes(1);
-    expect(mockRepo.createPayable).not.toHaveBeenCalled();
+    expect(mockRepo.registerFlight).toHaveBeenCalledTimes(1);
+    const input = mockRepo.registerFlight.mock.calls[0][0];
+    expect(input.buildReceivable).toBeDefined();
+    expect(input.buildPayable).toBeUndefined();
+  });
+
+  it('buildReceivable includes flight id in title', async () => {
+    await service.registerFlight(baseDto);
+
+    const input = mockRepo.registerFlight.mock.calls[0][0];
+    const receivable = input.buildReceivable(42);
+    expect(receivable.title).toBe('Voo SOLO #42');
+    expect(receivable.flight).toEqual({ connect: { id: 42 } });
   });
 
   it('creates flight, receivable AND payable for double_command flight', async () => {
@@ -73,17 +76,19 @@ describe('FlightsService', () => {
       double_command: true,
     });
 
-    expect(mockRepo.createReceivable).toHaveBeenCalledTimes(1);
-    expect(mockRepo.createPayable).toHaveBeenCalledTimes(1);
-    expect(mockRepo.createPayableInstallment).toHaveBeenCalledTimes(1);
+    const input = mockRepo.registerFlight.mock.calls[0][0];
+    expect(input.buildReceivable).toBeDefined();
+    expect(input.buildPayable).toBeDefined();
+
+    const { payableData, installmentData } = input.buildPayable(42);
+    expect(payableData.title).toBe('Instrução voo #42');
+    expect(installmentData.installment_number).toBe(1);
   });
 
   it('throws NotFoundException for unknown plane', async () => {
-    mockPrisma.plane.findUnique.mockResolvedValue(null);
+    mockRepo.findPlane.mockResolvedValue(null);
 
-    await expect(service.registerFlight(baseDto)).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(service.registerFlight(baseDto)).rejects.toThrow(NotFoundException);
   });
 
   it('throws BadRequestException when double_command has no instructor', async () => {
@@ -99,14 +104,16 @@ describe('FlightsService', () => {
       end_date: '2024-01-15T15:30:00-03:00',
     });
 
-    const arg = mockRepo.createFlight.mock.calls[0][0];
-    expect(arg.start_date.toISOString()).toBe('2024-01-15T17:00:00.000Z');
-    expect(arg.end_date.toISOString()).toBe('2024-01-15T18:30:00.000Z');
+    const { flightData } = mockRepo.registerFlight.mock.calls[0][0];
+    expect(flightData.start_date.toISOString()).toBe('2024-01-15T17:00:00.000Z');
+    expect(flightData.end_date.toISOString()).toBe('2024-01-15T18:30:00.000Z');
   });
 
   it('does not create receivable when no end_date is provided', async () => {
     await service.registerFlight({ ...baseDto, end_date: undefined });
 
-    expect(mockRepo.createReceivable).not.toHaveBeenCalled();
+    const input = mockRepo.registerFlight.mock.calls[0][0];
+    expect(input.buildReceivable).toBeUndefined();
+    expect(input.buildPayable).toBeUndefined();
   });
 });
