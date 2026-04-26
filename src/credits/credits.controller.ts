@@ -1,7 +1,16 @@
-import { Controller, Get, Post, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CreditsService, AddCreditDto } from './credits.service';
+import { CreditsService } from './credits.service';
+import { AddCreditDto } from './dto/add-credit.dto';
 
 @ApiTags('credits')
 @ApiBearerAuth()
@@ -18,7 +27,10 @@ export class CreditsController {
 
   @Post()
   @ApiOperation({ summary: 'Adicionar crédito ao cliente' })
-  addCredit(@Param('customerId', ParseIntPipe) customerId: number, @Body() dto: AddCreditDto) {
+  addCredit(
+    @Param('customerId', ParseIntPipe) customerId: number,
+    @Body() dto: AddCreditDto,
+  ) {
     return this.creditsService.addCredit(customerId, dto);
   }
 }

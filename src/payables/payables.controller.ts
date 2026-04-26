@@ -10,7 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { PayablesService, CreatePayablePaymentDto } from './payables.service';
+import { PayablesService } from './payables.service';
+import { CreatePayablePaymentDto } from './dto/create-payable-payment.dto';
 
 @ApiTags('payables')
 @ApiBearerAuth()

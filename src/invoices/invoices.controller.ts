@@ -1,7 +1,8 @@
 import { Controller, Get, Patch, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { InvoicesService, UpdateInvoiceDto } from './invoices.service';
+import { InvoicesService } from './invoices.service';
+import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 
 @ApiTags('invoices')
 @ApiBearerAuth()

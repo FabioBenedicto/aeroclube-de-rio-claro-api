@@ -1,7 +1,18 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CustomersService, CreateCustomerDto, UpdateCustomerDto } from './customers.service';
+import { CustomersService } from './customers.service';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('customers')
 @ApiBearerAuth()
@@ -12,19 +23,28 @@ export class CustomersController {
 
   @Get()
   @ApiOperation({ summary: 'Listar clientes com categorias' })
-  findAll() { return this.customersService.findAll(); }
+  findAll() {
+    return this.customersService.findAll();
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detalhes do cliente' })
-  findOne(@Param('id', ParseIntPipe) id: number) { return this.customersService.findOne(id); }
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.customersService.findOne(id);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Cadastrar cliente' })
-  create(@Body() dto: CreateCustomerDto) { return this.customersService.create(dto); }
+  create(@Body() dto: CreateCustomerDto) {
+    return this.customersService.create(dto);
+  }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar cliente' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCustomerDto) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCustomerDto,
+  ) {
     return this.customersService.update(id, dto);
   }
 }

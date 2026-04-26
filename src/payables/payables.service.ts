@@ -1,11 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PayablesRepository, RegisterPayablePaymentInput } from './payables.repository';
-
-export class CreatePayablePaymentDto implements RegisterPayablePaymentInput {
-  installment_id: number;
-  amount_paid: number;
-  payment_date?: string;
-}
+import { PayablesRepository } from './payables.repository';
+import { CreatePayablePaymentDto } from './dto/create-payable-payment.dto';
 
 @Injectable()
 export class PayablesService {

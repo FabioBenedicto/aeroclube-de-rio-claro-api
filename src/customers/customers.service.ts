@@ -1,31 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CustomersRepository } from './customers.repository';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
-function computeCategories(c: { instructors: unknown[]; students: unknown[]; partners: unknown[] }) {
+function computeCategories(c: {
+  instructors: unknown[];
+  students: unknown[];
+  partners: unknown[];
+}) {
   const cats: string[] = [];
   if (c.instructors.length) cats.push('instrutor');
-  if (c.students.length)    cats.push('aluno');
-  if (c.partners.length)    cats.push('socio');
+  if (c.students.length) cats.push('aluno');
+  if (c.partners.length) cats.push('socio');
   return cats;
 }
 
-function withCategories<T extends { instructors: unknown[]; students: unknown[]; partners: unknown[] }>(c: T) {
+function withCategories<
+  T extends { instructors: unknown[]; students: unknown[]; partners: unknown[] },
+>(c: T) {
   return { ...c, categories: computeCategories(c) };
-}
-
-export class CreateCustomerDto {
-  cpf: string;
-  name: string;
-  email: string;
-  phone_number?: string;
-  flight_hour_balance?: number;
-}
-
-export class UpdateCustomerDto {
-  name?: string;
-  email?: string;
-  phone_number?: string;
-  flight_hour_balance?: number;
 }
 
 @Injectable()

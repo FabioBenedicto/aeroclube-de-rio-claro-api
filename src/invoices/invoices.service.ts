@@ -1,16 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InvoicesRepository } from './invoices.repository';
-
-export class UpdateInvoiceDto {
-  status?: string;
-  due_date?: string;
-}
+import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 
 @Injectable()
 export class InvoicesService {
   constructor(private readonly repo: InvoicesRepository) {}
 
-  findAll() { return this.repo.findAll(); }
+  findAll() {
+    return this.repo.findAll();
+  }
 
   async findOne(id: number) {
     const inv = await this.repo.findById(id);

@@ -1,10 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-export class AddCreditDto {
-  amount: number;
-  notes?: string;
-}
+import { AddCreditDto } from './dto/add-credit.dto';
 
 @Injectable()
 export class CreditsService {

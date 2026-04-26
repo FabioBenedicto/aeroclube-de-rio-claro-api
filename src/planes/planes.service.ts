@@ -1,24 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PlanesRepository } from './planes.repository';
-
-export class CreatePlaneDto {
-  registration: string;
-  model?: string;
-  flight_hour_value: number;
-  status?: string;
-}
-
-export class UpdatePlaneDto {
-  model?: string;
-  flight_hour_value?: number;
-  status?: string;
-}
+import { CreatePlaneDto } from './dto/create-plane.dto';
+import { UpdatePlaneDto } from './dto/update-plane.dto';
 
 @Injectable()
 export class PlanesService {
   constructor(private readonly repo: PlanesRepository) {}
 
-  findAll() { return this.repo.findAll(); }
+  findAll() {
+    return this.repo.findAll();
+  }
 
   async findOne(id: number) {
     const plane = await this.repo.findById(id);
