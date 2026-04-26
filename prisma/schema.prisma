@@ -102,6 +102,7 @@ model Flight {
   instructor_id  Int?
   type           String    @db.VarChar(30)
   double_command Boolean   @default(false)
+  status         String    @default("in-flight") @db.VarChar(20)
   origin         String    @db.VarChar(10)
   destination    String    @db.VarChar(10)
   start_date     DateTime
