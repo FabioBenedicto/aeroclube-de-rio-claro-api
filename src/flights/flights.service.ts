@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Decimal } from '@prisma/client-runtime-utils';
 import { FlightsRepository } from './flights.repository';
 import { CreateFlightDto } from './dto/create-flight.dto';
@@ -9,8 +13,15 @@ export class FlightsService {
 
   async registerFlight(dto: CreateFlightDto) {
     const plane = await this.flightsRepository.findPlane(dto.plane_id);
-    if (!plane) throw new NotFoundException(`Aeronave ${dto.plane_id} não encontrada`);
-    if (plane.status !== 'active') throw new BadRequestException('Aeronave não está ativa');
+
+    if (!plane) {
+      throw new NotFoundException(`Aeronave ${dto.plane_id} não encontrada`);
+    }
+
+    if (plane.status !== 'active') {
+      throw new BadRequestException('Aeronave não está ativa');
+    }
+
     if (dto.double_command && !dto.instructor_id) {
       throw new BadRequestException('Duplo comando requer instructor_id');
     }
@@ -34,7 +45,9 @@ export class FlightsService {
       flightData: {
         plane: { connect: { id: dto.plane_id } },
         customer: { connect: { id: dto.customer_id } },
-        ...(dto.instructor_id && { instructor: { connect: { id: dto.instructor_id } } }),
+        ...(dto.instructor_id && {
+          instructor: { connect: { id: dto.instructor_id } },
+        }),
         type: dto.type,
         double_command: dto.double_command,
         origin: dto.origin,
@@ -51,28 +64,21 @@ export class FlightsService {
             title: `Voo ${dto.type.toUpperCase()} #${flightId}`,
             description: `${dto.origin} → ${dto.destination}`,
             expiration_date: expirationDate,
-            total_amount: totalAmount!,
+            total_amount: totalAmount,
             product: 'hora_voo',
           })
         : undefined,
-      buildPayable: dto.double_command && dto.instructor_id && totalAmount
-        ? (flightId) => ({
-            payableData: {
+      buildPayable:
+        dto.double_command && dto.instructor_id && totalAmount
+          ? (flightId) => ({
               instructor: { connect: { id: dto.instructor_id! } },
               title: `Instrução voo #${flightId}`,
               description: `Duplo comando — ${dto.origin} → ${dto.destination}`,
-              total_amount: totalAmount!,
-              installments_count: 1,
+              amount: totalAmount,
               product: 'instrucao',
-              expiration_date: expirationDate,
-            },
-            installmentData: {
-              installment_number: 1,
-              amount: totalAmount!,
-              expiration_date: expirationDate,
-            },
-          })
-        : undefined,
+              due_date: expirationDate,
+            })
+          : undefined,
     });
   }
 
@@ -81,19 +87,30 @@ export class FlightsService {
   }
 
   async findOne(id: number) {
-    const f = await this.flightsRepository.findById(id);
-    if (!f) throw new NotFoundException(`Voo ${id} não encontrado`);
-    return f;
+    const flight = await this.flightsRepository.findById(id);
+
+    if (!flight) {
+      throw new NotFoundException(`Voo ${id} não encontrado`);
+    }
+
+    return flight;
   }
 
   async closeFlight(id: number, endDateIso: string) {
     const flight = await this.findOne(id);
-    if (flight.status !== 'in-flight') throw new BadRequestException('Voo já está encerrado ou cancelado');
+
+    if (flight.status !== 'in-flight') {
+      throw new BadRequestException('Voo já está encerrado ou cancelado');
+    }
+
     const endDate = new Date(endDateIso);
-    const diffHours = (endDate.getTime() - flight.start_date.getTime()) / 3_600_000;
+    const diffHours =
+      (endDate.getTime() - flight.start_date.getTime()) / 3_600_000;
     const totalHours = new Decimal(diffHours.toFixed(2));
+
     const plane = await this.flightsRepository.findPlane(flight.plane_id);
     const totalAmount = plane!.flight_hour_value.mul(totalHours);
+
     return this.flightsRepository.updateFlight(id, {
       end_date: endDate,
       total_hours: totalHours,
@@ -104,7 +121,19 @@ export class FlightsService {
 
   async cancelFlight(id: number) {
     const flight = await this.findOne(id);
-    if (flight.status === 'cancelled') throw new BadRequestException('Voo já está cancelado');
+
+    if (flight.status === 'cancelled') {
+      throw new BadRequestException('Voo já está cancelado');
+    }
+
     return this.flightsRepository.updateFlight(id, { status: 'cancelled' });
+  }
+
+  async remove(id: number) {
+    const flight = await this.findOne(id);
+    if (flight.status === 'closed') {
+      throw new BadRequestException('Não é possível remover um voo encerrado');
+    }
+    return this.flightsRepository.delete(id);
   }
 }

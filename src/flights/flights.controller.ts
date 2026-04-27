@@ -1,4 +1,17 @@
-import { Controller, Post, Get, Patch, Body, Query, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  HttpCode,
+  HttpStatus,
+  Body,
+  Query,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -47,7 +60,10 @@ export class FlightsController {
   @Patch(':id/close')
   @Roles(Role.ADMIN, Role.EMPLOYEE)
   @ApiOperation({ summary: 'Encerrar voo — calcula horas e gera valor' })
-  closeFlight(@Param('id', ParseIntPipe) id: number, @Body('end_date') endDate: string) {
+  closeFlight(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('end_date') endDate: string,
+  ) {
     return this.flightsService.closeFlight(id, endDate);
   }
 
@@ -56,5 +72,13 @@ export class FlightsController {
   @ApiOperation({ summary: 'Cancelar voo' })
   cancelFlight(@Param('id', ParseIntPipe) id: number) {
     return this.flightsService.cancelFlight(id);
+  }
+
+  @Delete(':id')
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remover voo' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.flightsService.remove(id);
   }
 }

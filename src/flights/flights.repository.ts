@@ -6,10 +6,7 @@ import { Decimal } from '@prisma/client-runtime-utils';
 interface RegisterFlightInput {
   flightData: Prisma.FlightCreateInput;
   buildReceivable?: (flightId: number) => Prisma.ReceivableCreateInput;
-  buildPayable?: (flightId: number) => {
-    payableData: Prisma.PayableCreateInput;
-    installmentData: { installment_number: number; amount: Decimal; expiration_date: Date };
-  };
+  buildPayable?: (flightId: number) => Prisma.PayableCreateInput;
 }
 
 @Injectable()
@@ -28,11 +25,7 @@ export class FlightsRepository {
       }
 
       if (input.buildPayable) {
-        const { payableData, installmentData } = input.buildPayable(flight.id);
-        const payable = await tx.payable.create({ data: payableData });
-        await tx.payableInstallment.create({
-          data: { payable: { connect: { id: payable.id } }, ...installmentData },
-        });
+        await tx.payable.create({ data: input.buildPayable(flight.id) });
       }
 
       return flight;
@@ -47,18 +40,31 @@ export class FlightsRepository {
     return this.prisma.flight.findMany({
       where: status ? { status } : undefined,
       orderBy: { start_date: 'desc' },
-      include: { plane: true, customer: true, instructor: { include: { customer: true } } },
+      include: {
+        plane: true,
+        customer: true,
+        instructor: { include: { customer: true } },
+      },
     });
   }
 
   findById(id: number) {
     return this.prisma.flight.findUnique({
       where: { id },
-      include: { plane: true, customer: true, instructor: { include: { customer: true } }, receivables: true },
+      include: {
+        plane: true,
+        customer: true,
+        instructor: { include: { customer: true } },
+        receivables: true,
+      },
     });
   }
 
   updateFlight(id: number, data: Prisma.FlightUpdateInput) {
     return this.prisma.flight.update({ where: { id }, data });
+  }
+
+  delete(id: number) {
+    return this.prisma.flight.delete({ where: { id } });
   }
 }
