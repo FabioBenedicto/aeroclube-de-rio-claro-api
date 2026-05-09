@@ -2,45 +2,187 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Param,
   Body,
   Query,
   UseGuards,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
+  Res,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
+import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { PERM } from '../common/constants/permissions';
 import { ReceivablesService } from './receivables.service';
+import { CreateReceivableDto } from './dto/create-receivable.dto';
+import { UpdateReceivableDto } from './dto/update-receivable.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { buildExcel, reportFilename } from '../common/utils/excel.util';
+import { notaFiscalStorage, notaFiscalFilter, buildNfPath, deleteNfFile } from '../common/utils/upload.config';
+import { ExportThrottle } from '../common/decorators/export-throttle.decorator';
+import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
+
+const STATUS_LABEL: Record<number, string> = { 0: 'Em aberto', 1: 'Pago' };
 
 @ApiTags('receivables')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('receivables')
 export class ReceivablesController {
   constructor(private readonly receivablesService: ReceivablesService) {}
 
+  @Get('export')
+  @RequirePermission(PERM.RECEIVABLES.VIEW)
+  @ExportThrottle()
+  @ApiOperation({ summary: 'Exportar títulos a receber em Excel' })
+  async export(
+    @Query('status') status: string,
+    @Query('search') search: string,
+    @Query('date_from') dateFrom: string,
+    @Query('date_to') dateTo: string,
+    @Res() res: Response,
+  ) {
+    const { total } = await this.receivablesService.findAll(status, search, dateFrom, dateTo, 1, 1);
+    if (total > MAX_EXPORT_ROWS) {
+      throw new BadRequestException(
+        `Existem ${total} registros. Use os filtros para reduzir para no máximo ${MAX_EXPORT_ROWS}.`,
+      );
+    }
+    const { data } = await this.receivablesService.findAll(status, search, dateFrom, dateTo, 1, total || 1);
+    const rows = data.map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      product: r.product ?? '',
+      customer: r.customer?.name ?? r.company?.name ?? '',
+      expiration_date: r.expiration_date ? new Date(r.expiration_date).toLocaleDateString('pt-BR') : '',
+      total_amount: Number(r.total_amount),
+      amount_received: Number(r.amount_received),
+      remaining: Number(r.total_amount) - Number(r.amount_received),
+      status: STATUS_LABEL[r.status] ?? String(r.status),
+    }));
+
+    const buffer = await buildExcel('Contas a receber', [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Título', key: 'title', width: 35 },
+      { header: 'Tipo', key: 'product', width: 16 },
+      { header: 'Cliente / Empresa', key: 'customer', width: 30 },
+      { header: 'Vencimento', key: 'expiration_date', width: 14 },
+      { header: 'Valor Total (R$)', key: 'total_amount', width: 18 },
+      { header: 'Recebido (R$)', key: 'amount_received', width: 16 },
+      { header: 'Saldo (R$)', key: 'remaining', width: 14 },
+      { header: 'Status', key: 'status', width: 14 },
+    ], rows);
+
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${reportFilename('contas-a-receber.xlsx')}"`,
+    });
+    res.send(buffer);
+  }
+
   @Get()
+  @RequirePermission(PERM.RECEIVABLES.VIEW)
   @ApiOperation({ summary: 'Listar títulos a receber' })
-  findAll(@Query('status') status?: string) { return this.receivablesService.findAll(status); }
+  findAll(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.receivablesService.findAll(status, search, dateFrom, dateTo, Number(page), Number(limit));
+  }
 
   @Get(':id')
+  @RequirePermission(PERM.RECEIVABLES.VIEW)
   @ApiOperation({ summary: 'Detalhes do título' })
-  findOne(@Param('id', ParseIntPipe) id: number) { return this.receivablesService.findOne(id); }
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.receivablesService.findOne(id);
+  }
+
+  @Post()
+  @RequirePermission(PERM.RECEIVABLES.CREATE)
+  @ApiOperation({ summary: 'Criar título a receber' })
+  create(@Body() dto: CreateReceivableDto) {
+    return this.receivablesService.create(dto);
+  }
+
+  @Patch(':id')
+  @RequirePermission(PERM.RECEIVABLES.UPDATE)
+  @ApiOperation({ summary: 'Atualizar título a receber' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateReceivableDto,
+  ) {
+    return this.receivablesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @RequirePermission(PERM.RECEIVABLES.DELETE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Excluir título a receber' })
+  delete(@Param('id', ParseIntPipe) id: number) {
+    return this.receivablesService.delete(id);
+  }
 
   @Post(':id/payments')
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @RequirePermission(PERM.RECEIVABLES.UPDATE)
   @ApiOperation({ summary: 'Registrar pagamento de título a receber' })
-  @ApiResponse({ status: 201, description: 'Pagamento registrado com sucesso' })
-  @ApiResponse({ status: 404, description: 'Título não encontrado' })
-  @ApiResponse({ status: 400, description: 'Título já quitado' })
   registerPayment(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreatePaymentDto,
   ) {
     return this.receivablesService.registerPayment(id, dto);
+  }
+
+  @Delete(':id/payments/:paymentId')
+  @RequirePermission(PERM.RECEIVABLES.UPDATE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Estornar pagamento de título a receber' })
+  deletePayment(
+    @Param('id', ParseIntPipe) _id: number,
+    @Param('paymentId', ParseIntPipe) paymentId: number,
+  ) {
+    return this.receivablesService.deletePayment(paymentId);
+  }
+
+  @Post(':id/payments/:paymentId/nota-fiscal')
+  @RequirePermission(PERM.RECEIVABLES.UPDATE)
+  @ApiOperation({ summary: 'Anexar nota fiscal ao pagamento' })
+  @UseInterceptors(FileInterceptor('file', {
+    storage: notaFiscalStorage('receivable-payments'),
+    fileFilter: notaFiscalFilter,
+    limits: { fileSize: 10 * 1024 * 1024 },
+  }))
+  async uploadPaymentNotaFiscal(
+    @Param('paymentId', ParseIntPipe) paymentId: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Nenhum arquivo enviado');
+    const payment = await this.receivablesService.getPayment(paymentId);
+    deleteNfFile(payment.nota_fiscal_path ?? null);
+    const path = buildNfPath('receivable-payments', file.filename);
+    return this.receivablesService.setPaymentNotaFiscal(paymentId, path);
+  }
+
+  @Delete(':id/payments/:paymentId/nota-fiscal')
+  @RequirePermission(PERM.RECEIVABLES.UPDATE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remover nota fiscal do pagamento' })
+  async deletePaymentNotaFiscal(@Param('paymentId', ParseIntPipe) paymentId: number) {
+    const payment = await this.receivablesService.getPayment(paymentId);
+    deleteNfFile(payment.nota_fiscal_path ?? null);
+    await this.receivablesService.setPaymentNotaFiscal(paymentId, null);
   }
 }
