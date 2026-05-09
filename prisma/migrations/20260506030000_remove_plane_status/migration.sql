@@ -1,0 +1,1 @@
+ALTER TABLE "planes" DROP COLUMN IF EXISTS "status";
