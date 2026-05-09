@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { jwtConfig } from './config/jwt.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -8,13 +9,17 @@ import { ReceivablesModule } from './receivables/receivables.module';
 import { PlanesModule } from './planes/planes.module';
 import { CustomersModule } from './customers/customers.module';
 import { PayablesModule } from './payables/payables.module';
-import { InvoicesModule } from './invoices/invoices.module';
+import { BillsModule } from './bills/bills.module';
 import { CreditsModule } from './credits/credits.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SettingsModule } from './settings/settings.module';
+import { CompaniesModule } from './companies/companies.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [jwtConfig] }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     AuthModule,
     FlightsModule,
@@ -22,9 +27,12 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PlanesModule,
     CustomersModule,
     PayablesModule,
-    InvoicesModule,
+    BillsModule,
     CreditsModule,
     DashboardModule,
+    SettingsModule,
+    CompaniesModule,
+    UsersModule,
   ],
 })
 export class AppModule {}
