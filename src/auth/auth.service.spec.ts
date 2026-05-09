@@ -32,6 +32,7 @@ describe('AuthService', () => {
       password: hashed,
       name: 'Admin',
       role: 'ADMIN',
+      permissions: [],
     });
 
     const result = await service.login({
@@ -59,6 +60,7 @@ describe('AuthService', () => {
       password: hashed,
       name: 'Admin',
       role: 'ADMIN',
+      permissions: [],
     });
 
     await expect(
