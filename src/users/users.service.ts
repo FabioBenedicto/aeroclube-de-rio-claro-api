@@ -8,7 +8,7 @@ export interface CreateUserDto {
   email: string;
   password: string;
   role: Role;
-  permissions: string[];
+  permissions?: string[];
 }
 
 export interface UpdateUserDto {
