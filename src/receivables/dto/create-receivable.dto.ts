@@ -39,6 +39,16 @@ export class CreateReceivableDto {
   @Type(() => Number)
   plane_id?: number;
 
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  partner_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  employee_id?: number;
+
   @IsEnum(PayerType)
   @IsOptional()
   payer_type?: PayerType;

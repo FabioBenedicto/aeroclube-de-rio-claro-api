@@ -78,7 +78,8 @@ model Partner {
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
-  customer Customer @relation(fields: [customer_id], references: [id])
+  customer     Customer     @relation(fields: [customer_id], references: [id])
+  receivables  Receivable[]
 
   @@map("partners")
 }
@@ -96,7 +97,8 @@ model Employee {
   id          Int      @id @default(autoincrement())
   customer_id Int
 
-  customer Customer @relation(fields: [customer_id], references: [id])
+  customer     Customer     @relation(fields: [customer_id], references: [id])
+  receivables  Receivable[]
 
   @@map("employees")
 }
@@ -173,6 +175,8 @@ enum PayerType {
   customer
   company
   instructor
+  partner
+  employee
   none
 }
 
@@ -183,6 +187,8 @@ model Receivable {
   flight_id       Int?
   instructor_id   Int?
   plane_id        Int?
+  partner_id      Int?
+  employee_id     Int?
   payer_type      PayerType @default(none)
   title           String    @db.VarChar(100)
   description     String?
@@ -199,6 +205,8 @@ model Receivable {
   flight     Flight?     @relation(fields: [flight_id], references: [id], onDelete: Cascade)
   instructor Instructor? @relation(fields: [instructor_id], references: [id])
   plane      Plane?      @relation(fields: [plane_id], references: [id])
+  partner    Partner?    @relation(fields: [partner_id], references: [id])
+  employee   Employee?   @relation(fields: [employee_id], references: [id])
   payments   ReceivablePayment[]
 
   @@map("receivables")
