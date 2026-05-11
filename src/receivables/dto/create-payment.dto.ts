@@ -1,11 +1,11 @@
-import { IsNumber, IsString, IsDateString, IsOptional, Min } from 'class-validator';
+import { IsNumber, IsString, IsDateString, IsOptional, IsBoolean, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreatePaymentDto {
   @ApiProperty({ example: 150.0 })
   @IsNumber()
-  @Min(0.01)
+  @Min(0)
   @Type(() => Number)
   amount_received: number;
 
@@ -19,8 +19,8 @@ export class CreatePaymentDto {
   @IsOptional()
   payment_date?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({ example: true })
+  @IsBoolean()
   @IsOptional()
-  notes?: string;
+  use_credit?: boolean;
 }
