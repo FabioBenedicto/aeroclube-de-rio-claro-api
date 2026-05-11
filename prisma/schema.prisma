@@ -80,6 +80,7 @@ model Partner {
 
   customer     Customer     @relation(fields: [customer_id], references: [id])
   receivables  Receivable[]
+  payables     Payable[]
 
   @@map("partners")
 }
@@ -99,6 +100,7 @@ model Employee {
 
   customer     Customer     @relation(fields: [customer_id], references: [id])
   receivables  Receivable[]
+  payables     Payable[]
 
   @@map("employees")
 }
@@ -233,6 +235,9 @@ model Payable {
   company_id    Int?
   instructor_id Int?
   plane_id      Int?
+  partner_id    Int?
+  employee_id   Int?
+  payer_type    PayerType @default(none)
   title         String    @db.VarChar(100)
   description   String?
   amount        Decimal   @db.Decimal(10, 2)
@@ -247,6 +252,8 @@ model Payable {
   company    Company?       @relation(fields: [company_id], references: [id])
   instructor Instructor?    @relation(fields: [instructor_id], references: [id])
   plane      Plane?         @relation(fields: [plane_id], references: [id])
+  partner    Partner?       @relation(fields: [partner_id], references: [id])
+  employee   Employee?      @relation(fields: [employee_id], references: [id])
   payments   PayablePayment[]
 
   @@map("payables")

@@ -1,20 +1,21 @@
-import { IsInt, IsNumber, IsDateString, IsOptional, Min } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsString, IsDateString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePayablePaymentDto {
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  installment_id: number;
-
-  @ApiProperty({ example: 150.0 })
   @IsNumber()
   @Min(0.01)
   @Type(() => Number)
-  amount_paid: number;
+  amount: number;
 
-  @ApiPropertyOptional({ example: '2024-01-15T14:00:00Z' })
+  @IsString()
+  @IsOptional()
+  method?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
   @IsDateString()
   @IsOptional()
-  payment_date?: string;
+  paid_at?: string;
 }
