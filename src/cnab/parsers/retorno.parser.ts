@@ -67,6 +67,11 @@ export function parseRetorno(content: string): RetornoResult {
         const paymentDate = parseDateCnab(dataOcorrStr);
 
         result.paid.push({ billId: pendingT.billId, paymentDate, valorPago });
+      } else if (movementCode !== '02') {
+        // '02' = entrada confirmada, expected and ignored
+        result.errors.push(
+          `Linha ${i + 1}: movimento "${movementCode}" não processado para fatura ${pendingT.billId}`,
+        );
       }
 
       pendingT = null;

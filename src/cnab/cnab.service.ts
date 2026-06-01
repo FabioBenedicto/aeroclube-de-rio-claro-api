@@ -14,10 +14,13 @@ export class CnabService {
 
     if (
       !settings?.sicoob_cooperativa_prefix ||
+      !settings?.sicoob_cooperativa_dv ||
       !settings?.sicoob_conta ||
+      !settings?.sicoob_conta_dv ||
       !settings?.sicoob_cnpj ||
       !settings?.sicoob_carteira ||
-      !settings?.sicoob_modalidade
+      !settings?.sicoob_modalidade ||
+      !settings?.sicoob_nome_empresa
     ) {
       throw new UnprocessableEntityException(
         'Configurações Sicoob incompletas. Preencha em PUT /api/settings.',
@@ -34,7 +37,21 @@ export class CnabService {
     }
 
     const now = new Date();
-    const lines = buildRemessaLines(settings as any, bills as any, now);
+    const lines = buildRemessaLines(
+      {
+        sicoob_cooperativa_prefix: settings.sicoob_cooperativa_prefix,
+        sicoob_cooperativa_dv: settings.sicoob_cooperativa_dv,
+        sicoob_conta: settings.sicoob_conta,
+        sicoob_conta_dv: settings.sicoob_conta_dv,
+        sicoob_carteira: settings.sicoob_carteira,
+        sicoob_modalidade: settings.sicoob_modalidade,
+        sicoob_cnpj: settings.sicoob_cnpj,
+        sicoob_nome_empresa: settings.sicoob_nome_empresa,
+        sicoob_remessa_sequence: settings.sicoob_remessa_sequence,
+      },
+      bills as any,
+      now,
+    );
     const content = lines.join('\r\n') + '\r\n';
 
     await this.repo.incrementRemessaSequence();

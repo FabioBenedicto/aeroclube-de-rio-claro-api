@@ -18,6 +18,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { BillsService } from './bills.service';
 import { CreateBillDto } from './dto/create-bill.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
@@ -26,7 +28,7 @@ import { notaFiscalStorage, notaFiscalFilter, buildNfPath, deleteNfFile } from '
 
 @ApiTags('bills')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('bills')
 export class BillsController {
   constructor(private readonly billsService: BillsService) {}
@@ -62,6 +64,7 @@ export class BillsController {
   }
 
   @Post('boleto')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Criar fatura de boleto (sem baixa imediata)' })
   createBoleto(@Body() dto: CreateBoletoBillDto) {
     return this.billsService.createBoleto(dto);

@@ -1,4 +1,4 @@
-import { IsInt, IsNumber, IsString, Min } from 'class-validator';
+import { IsInt, IsNumber, IsDateString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateBoletoBillDto {
@@ -11,6 +11,6 @@ export class CreateBoletoBillDto {
   @Type(() => Number)
   total_amount: number;
 
-  @IsString()
+  @IsDateString()
   due_date: string;
 }
