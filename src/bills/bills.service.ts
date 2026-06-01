@@ -7,8 +7,8 @@ import { UpdateBillDto } from './dto/update-bill.dto';
 export class BillsService {
   constructor(private readonly repo: BillsRepository) {}
 
-  async findAll(customerId?: number, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20) {
-    const { data, total } = await this.repo.findAll(customerId, dateFrom, dateTo, page, limit);
+  async findAll(customerId?: number, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20, pending = false, dueFrom?: Date, dueTo?: Date) {
+    const { data, total } = await this.repo.findAll(customerId, dateFrom, dateTo, page, limit, pending, dueFrom, dueTo);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 

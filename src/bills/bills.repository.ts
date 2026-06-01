@@ -14,14 +14,21 @@ const include = {
 export class BillsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(customerId?: number, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20) {
+  async findAll(customerId?: number, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20, pending = false, dueFrom?: Date, dueTo?: Date) {
     const AND: Prisma.BillWhereInput[] = [];
     if (customerId) AND.push({ customer_id: customerId });
+    if (pending) AND.push({ paid_at: null });
     if (dateFrom || dateTo) {
       const range: Prisma.DateTimeFilter = {};
       if (dateFrom) range.gte = dateFrom;
       if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); range.lte = end; }
       AND.push({ issue_date: range });
+    }
+    if (dueFrom || dueTo) {
+      const dueRange: Prisma.DateTimeNullableFilter = {};
+      if (dueFrom) dueRange.gte = dueFrom;
+      if (dueTo) { const end = new Date(dueTo); end.setHours(23, 59, 59, 999); dueRange.lte = end; }
+      AND.push({ due_date: dueRange });
     }
     const where = AND.length > 0 ? { AND } : undefined;
     const skip = (page - 1) * limit;

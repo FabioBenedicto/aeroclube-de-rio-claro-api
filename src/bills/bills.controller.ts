@@ -39,6 +39,9 @@ export class BillsController {
     @Query('customer_id') customerId?: string,
     @Query('date_from') dateFrom?: string,
     @Query('date_to') dateTo?: string,
+    @Query('pending') pending?: string,
+    @Query('due_from') dueFrom?: string,
+    @Query('due_to') dueTo?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -48,6 +51,9 @@ export class BillsController {
       dateTo ? new Date(dateTo) : undefined,
       Number(page),
       Number(limit),
+      pending === 'true',
+      dueFrom ? new Date(dueFrom) : undefined,
+      dueTo ? new Date(dueTo) : undefined,
     );
   }
 
