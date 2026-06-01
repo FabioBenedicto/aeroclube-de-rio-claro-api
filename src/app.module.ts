@@ -15,6 +15,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SettingsModule } from './settings/settings.module';
 import { CompaniesModule } from './companies/companies.module';
 import { UsersModule } from './users/users.module';
+import { ReportsModule } from './reports/reports.module';
+import { CnabModule } from './cnab/cnab.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { UsersModule } from './users/users.module';
     SettingsModule,
     CompaniesModule,
     UsersModule,
+    ReportsModule,
+    CnabModule,
   ],
 })
 export class AppModule {}

@@ -1,0 +1,58 @@
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import * as iconv from 'iconv-lite';
+import { CnabRepository } from './cnab.repository';
+import { GenerateRemessaDto } from './dto/generate-remessa.dto';
+import { buildRemessaLines } from './builders/remessa.builder';
+import { parseRetorno, RetornoResult } from './parsers/retorno.parser';
+
+@Injectable()
+export class CnabService {
+  constructor(private readonly repo: CnabRepository) {}
+
+  async generateRemessa(dto: GenerateRemessaDto): Promise<Buffer> {
+    const settings = await this.repo.getSettings();
+
+    if (
+      !settings?.sicoob_cooperativa_prefix ||
+      !settings?.sicoob_conta ||
+      !settings?.sicoob_cnpj ||
+      !settings?.sicoob_carteira ||
+      !settings?.sicoob_modalidade
+    ) {
+      throw new UnprocessableEntityException(
+        'Configurações Sicoob incompletas. Preencha em PUT /api/settings.',
+      );
+    }
+
+    const bills = await this.repo.findBillsByIds(dto.bill_ids);
+
+    const invalidBills = bills.filter((b) => !b.due_date);
+    if (invalidBills.length > 0) {
+      throw new UnprocessableEntityException(
+        `Faturas sem data de vencimento: ${invalidBills.map((b) => b.id).join(', ')}`,
+      );
+    }
+
+    const now = new Date();
+    const lines = buildRemessaLines(settings as any, bills as any, now);
+    const content = lines.join('\r\n') + '\r\n';
+
+    await this.repo.incrementRemessaSequence();
+
+    return iconv.encode(content, 'win1252');
+  }
+
+  async processRetorno(fileBuffer: Buffer): Promise<RetornoResult & { updated: number[] }> {
+    const content = iconv.decode(fileBuffer, 'win1252');
+    const result = parseRetorno(content);
+
+    const updated: number[] = [];
+    for (const entry of result.paid) {
+      const bill = await this.repo.markBillPaid(entry.billId, entry.paymentDate).catch(() => null);
+      if (bill) updated.push(entry.billId);
+      else result.errors.push(`Fatura ${entry.billId} não encontrada no sistema`);
+    }
+
+    return { ...result, updated };
+  }
+}
