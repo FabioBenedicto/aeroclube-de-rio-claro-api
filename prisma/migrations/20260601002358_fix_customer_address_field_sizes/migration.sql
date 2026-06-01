@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "customer" ALTER COLUMN "city" SET DATA TYPE VARCHAR(50),
+ALTER COLUMN "neighborhood" SET DATA TYPE VARCHAR(50);
