@@ -12,9 +12,22 @@ enum Role {
 }
 
 model Settings {
-  id                    Int     @id @default(1)
-  instructor_percentage Decimal @db.Decimal(5, 2)
-  partner_monthly_dues  Decimal @db.Decimal(10, 2)
+  id                     Int     @id @default(1)
+  instructor_percentage  Decimal @db.Decimal(5, 2)
+  partner_monthly_dues   Decimal @db.Decimal(10, 2)
+  glider_initial_minutes Int     @default(45)
+  glider_initial_value   Decimal @default(330) @db.Decimal(10, 2)
+  glider_minute_value    Decimal @default(3) @db.Decimal(10, 2)
+
+  sicoob_cooperativa_prefix String? @db.VarChar(5)
+  sicoob_cooperativa_dv     String? @db.VarChar(1)
+  sicoob_conta              String? @db.VarChar(12)
+  sicoob_conta_dv           String? @db.VarChar(1)
+  sicoob_carteira           String? @db.VarChar(1)
+  sicoob_modalidade         String? @db.VarChar(2)
+  sicoob_cnpj               String? @db.VarChar(14)
+  sicoob_nome_empresa       String? @db.VarChar(30)
+  sicoob_remessa_sequence   Int     @default(0)
 
   @@map("settings")
 }
@@ -41,6 +54,11 @@ model Customer {
   phone_number        String?  @db.VarChar(20)
   flight_hour_balance Int      @default(0)
   credit_balance      Decimal  @default(0) @db.Decimal(10, 2)
+  address             String?  @db.VarChar(40)
+  neighborhood        String?  @db.VarChar(15)
+  city                String?  @db.VarChar(15)
+  state               String?  @db.VarChar(2)
+  zip_code            String?  @db.VarChar(8)
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
@@ -109,7 +127,8 @@ model Plane {
   id                Int      @id @default(autoincrement())
   registration      String   @unique @db.VarChar(10)
   model             String?  @db.VarChar(60)
-  flight_hour_value Decimal  @db.Decimal(10, 2)
+  aircraft_type     String   @default("airplane") @db.VarChar(10)
+  flight_hour_value Decimal? @db.Decimal(10, 2)
   created_at        DateTime @default(now())
 
   flights     Flight[]
@@ -120,18 +139,20 @@ model Plane {
 }
 
 model Flight {
-  id             Int       @id @default(autoincrement())
-  plane_id       Int
-  customer_id    Int
-  instructor_id  Int?
-  type           String    @db.VarChar(30)
-  double_command Boolean   @default(false)
-  origin         String    @db.VarChar(10)
-  destination    String    @db.VarChar(10)
-  start_date     DateTime
-  end_date       DateTime?
-  total_hours    Decimal?  @db.Decimal(6, 2)
-  total_amount   Decimal?  @db.Decimal(10, 2)
+  id                    Int       @id @default(autoincrement())
+  plane_id              Int
+  customer_id           Int
+  instructor_id         Int?
+  aircraft_type         String    @default("airplane") @db.VarChar(10)
+  type                  String    @db.VarChar(30)
+  double_command        Boolean   @default(false)
+  origin                String    @db.VarChar(10)
+  destination           String    @db.VarChar(10)
+  start_date            DateTime
+  end_date              DateTime?
+  total_hours           Decimal?  @db.Decimal(6, 2)
+  total_amount          Decimal?  @db.Decimal(10, 2)
+  calculation_breakdown Json?
 
   plane      Plane       @relation(fields: [plane_id], references: [id])
   customer   Customer    @relation(fields: [customer_id], references: [id])
@@ -194,7 +215,7 @@ model Receivable {
   payer_type      PayerType @default(none)
   title           String    @db.VarChar(100)
   description     String?
-  expiration_date DateTime  @db.Date
+  expiration_date DateTime? @db.Date
   total_amount    Decimal   @db.Decimal(10, 2)
   amount_received Decimal   @default(0) @db.Decimal(10, 2)
   product         String?   @db.VarChar(50)
