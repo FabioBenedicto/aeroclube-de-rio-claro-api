@@ -163,14 +163,24 @@ model Flight {
   @@map("flights")
 }
 
+enum BillStatus {
+  open
+  pending_cnab
+  paid
+  cancelled
+}
+
 model Bill {
-  id               Int       @id @default(autoincrement())
+  id               Int        @id @default(autoincrement())
   customer_id      Int
-  total_amount     Decimal   @default(0) @db.Decimal(10, 2)
-  issue_date       DateTime  @default(now()) @db.Date
-  due_date         DateTime? @db.Date
+  total_amount     Decimal    @default(0) @db.Decimal(10, 2)
+  issue_date       DateTime   @default(now()) @db.Date
+  due_date         DateTime?  @db.Date
   paid_at          DateTime?
-  created_at       DateTime  @default(now())
+  status           BillStatus @default(open)
+  payment_source   String?    @db.VarChar(10)
+  payment_method   String?    @db.VarChar(30)
+  created_at       DateTime   @default(now())
   nota_fiscal_path String?
 
   customer            Customer            @relation(fields: [customer_id], references: [id])
