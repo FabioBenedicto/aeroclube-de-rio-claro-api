@@ -17,6 +17,7 @@ import { CompaniesModule } from './companies/companies.module';
 import { UsersModule } from './users/users.module';
 import { ReportsModule } from './reports/reports.module';
 import { CnabModule } from './cnab/cnab.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { CnabModule } from './cnab/cnab.module';
     UsersModule,
     ReportsModule,
     CnabModule,
+    InvoicesModule,
   ],
 })
 export class AppModule {}
