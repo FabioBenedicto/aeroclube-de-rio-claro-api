@@ -10,6 +10,8 @@ const mockSettings = {
   sicoob_cnpj: '12345678000100',
   sicoob_nome_empresa: 'AEROCLUBE RIO CLARO',
   sicoob_remessa_sequence: 1,
+  sicoob_juros: 0,
+  sicoob_juros_prazo: 0,
 };
 
 const mockBill = {
@@ -101,6 +103,30 @@ describe('buildRemessaLines', () => {
     });
     it('has especie DS (04) at positions 107-108 (0-indexed: 106-107)', () => {
       expect(lines[2].substring(106, 108)).toBe('04');
+    });
+    it('has distribution code 2 (empresa) at position 62 (0-indexed: 61)', () => {
+      expect(lines[2].charAt(61)).toBe('2');
+    });
+    it('has interest code 0 (isento) when sicoob_juros=0 at position 118 (0-indexed: 117)', () => {
+      expect(lines[2].charAt(117)).toBe('0');
+    });
+    it('has interest date 00000000 when sicoob_juros=0 at positions 119-126 (0-indexed: 118-125)', () => {
+      expect(lines[2].substring(118, 126)).toBe('00000000');
+    });
+  });
+
+  describe('Segmento P com juros configurados', () => {
+    it('has interest code 2 and date=due_date when sicoob_juros>0 and prazo=0', () => {
+      const settingsWithJuros = { ...mockSettings, sicoob_juros: 1, sicoob_juros_prazo: 0 };
+      const linesWithJuros = buildRemessaLines(settingsWithJuros as any, [mockBill as any], generationDate);
+      expect(linesWithJuros[2].charAt(117)).toBe('2');
+      expect(linesWithJuros[2].substring(118, 126)).toBe('15062026'); // due_date
+    });
+    it('has interest date=due_date+prazo when sicoob_juros>0 and prazo=5', () => {
+      const settingsWithPrazo = { ...mockSettings, sicoob_juros: 1, sicoob_juros_prazo: 5 };
+      const linesWithPrazo = buildRemessaLines(settingsWithPrazo as any, [mockBill as any], generationDate);
+      expect(linesWithPrazo[2].charAt(117)).toBe('2');
+      expect(linesWithPrazo[2].substring(118, 126)).toBe('20062026'); // 15/06 + 5 = 20/06
     });
   });
 

@@ -12,6 +12,7 @@ type SicoobSettings = {
   sicoob_remessa_sequence: number;
   sicoob_juros: number;
   sicoob_juros_prazo: number;
+  sicoob_agencia?: string | null;
 };
 
 type BillWithCustomer = {
@@ -105,7 +106,7 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     'P' +                                    // 014 segmento
     ' ' +                                    // 015 CNAB
     '01' +                                   // 016-017 cód movimento entrada
-    numericPad(s.sicoob_cooperativa_prefix, 5) + // 018-022 prefixo coop
+    numericPad(s.sicoob_agencia ?? s.sicoob_cooperativa_prefix, 5) + // 018-022 agência mantenedora
     alphaPad(s.sicoob_cooperativa_dv, 1) +   // 023 DV prefixo
     numericPad(s.sicoob_conta, 12) +         // 024-035 conta
     numericPad(s.sicoob_conta_dv, 1) +       // 036 DV conta
@@ -115,7 +116,7 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     '0' +                                    // 059 cadastramento
     ' ' +                                    // 060 tipo documento
     '1' +                                    // 061 emissão Sicoob
-    '1' +                                    // 062 distribuição Sicoob
+    '2' +                                    // 062 distribuição a cargo da empresa
     numericPad(bill.id, 15) +                // 063-077 nº documento = bill.id
     formatDate(bill.due_date) +              // 078-085 vencimento
     formatValue(bill.total_amount, 15) +     // 086-100 valor nominal (13+2)
@@ -124,15 +125,13 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     '04' +                                   // 107-108 espécie DS
     'N' +                                    // 109 aceite não aceite
     formatDate(bill.issue_date) +            // 110-117 data emissão
-    '2' +                                    // 118 código juros taxa mensal
+    (s.sicoob_juros > 0 ? '2' : '0') +      // 118 código juros (2=taxa mensal, 0=isento)
     (() => {
-      if (s.sicoob_juros_prazo > 0) {
-        const d = new Date(bill.due_date);
-        d.setUTCDate(d.getUTCDate() + s.sicoob_juros_prazo);
-        return formatDate(d);
-      }
-      return '00000000';
-    })() +                                   // 119-126 data juros mora (00000000 = no vencimento)
+      if (s.sicoob_juros <= 0) return '00000000';
+      const d = new Date(bill.due_date);
+      if (s.sicoob_juros_prazo > 0) d.setUTCDate(d.getUTCDate() + s.sicoob_juros_prazo);
+      return formatDate(d);
+    })() +                                   // 119-126 data início juros (obrigatório quando código != 0)
     formatValue(s.sicoob_juros, 15) +        // 127-141 juros mora % mensal (15 chars = 13+2 decimais)
     '0' +                                    // 142 cód desconto 1
     '00000000' +                             // 143-150 data desconto 1

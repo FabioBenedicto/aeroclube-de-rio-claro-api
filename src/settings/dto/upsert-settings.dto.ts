@@ -45,6 +45,11 @@ export class UpsertSettingsDto {
 
   @IsString()
   @IsOptional()
+  @Matches(/^\d{1,4}$/, { message: 'sicoob_agencia deve ter até 4 dígitos' })
+  sicoob_agencia?: string;
+
+  @IsString()
+  @IsOptional()
   @Matches(/^\d{1,12}$/, { message: 'sicoob_conta deve ter até 12 dígitos' })
   sicoob_conta?: string;
 

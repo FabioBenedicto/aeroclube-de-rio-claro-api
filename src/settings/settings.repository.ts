@@ -23,6 +23,7 @@ export class SettingsRepository {
     const sicoob = {
       ...(dto.sicoob_cooperativa_prefix !== undefined && { sicoob_cooperativa_prefix: dto.sicoob_cooperativa_prefix }),
       ...(dto.sicoob_cooperativa_dv !== undefined && { sicoob_cooperativa_dv: dto.sicoob_cooperativa_dv }),
+      ...(dto.sicoob_agencia !== undefined && { sicoob_agencia: dto.sicoob_agencia }),
       ...(dto.sicoob_conta !== undefined && { sicoob_conta: dto.sicoob_conta }),
       ...(dto.sicoob_conta_dv !== undefined && { sicoob_conta_dv: dto.sicoob_conta_dv }),
       ...(dto.sicoob_carteira !== undefined && { sicoob_carteira: dto.sicoob_carteira }),

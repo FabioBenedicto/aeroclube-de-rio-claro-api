@@ -50,6 +50,7 @@ export class CnabService {
         sicoob_remessa_sequence: settings.sicoob_remessa_sequence,
         sicoob_juros: Number(settings.sicoob_juros ?? 0),
         sicoob_juros_prazo: settings.sicoob_juros_prazo ?? 0,
+        sicoob_agencia: settings.sicoob_agencia,
       },
       bills as any,
       now,

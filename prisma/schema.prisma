@@ -21,6 +21,7 @@ model Settings {
 
   sicoob_cooperativa_prefix String? @db.VarChar(5)
   sicoob_cooperativa_dv     String? @db.VarChar(1)
+  sicoob_agencia            String? @db.VarChar(4)
   sicoob_conta              String? @db.VarChar(12)
   sicoob_conta_dv           String? @db.VarChar(1)
   sicoob_carteira           String? @db.VarChar(1)
