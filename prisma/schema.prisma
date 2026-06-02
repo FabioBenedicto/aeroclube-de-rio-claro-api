@@ -317,3 +317,27 @@ model UserPermission {
   @@unique([user_id, permission])
   @@map("user_permissions")
 }
+
+model CnabRemessa {
+  id              Int      @id @default(autoincrement())
+  created_at      DateTime @default(now())
+  sequence_number Int
+  bill_ids        Json
+  bill_count      Int
+  total_amount    Decimal  @db.Decimal(12, 2)
+  file_path       String   @db.VarChar(200)
+
+  @@map("cnab_remessas")
+}
+
+model CnabRetorno {
+  id             Int      @id @default(autoincrement())
+  processed_at   DateTime @default(now())
+  paid_ids       Json
+  rejected_ids   Json
+  errors         Json
+  paid_count     Int
+  rejected_count Int
+
+  @@map("cnab_retornos")
+}
