@@ -129,7 +129,7 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     (() => {
       if (s.sicoob_juros <= 0) return '00000000';
       const d = new Date(bill.due_date);
-      if (s.sicoob_juros_prazo > 0) d.setUTCDate(d.getUTCDate() + s.sicoob_juros_prazo);
+      d.setUTCDate(d.getUTCDate() + Math.max(s.sicoob_juros_prazo, 1));
       return formatDate(d);
     })() +                                   // 119-126 data início juros (obrigatório quando código != 0)
     formatValue(s.sicoob_juros, 15) +        // 127-141 juros mora % mensal (15 chars = 13+2 decimais)

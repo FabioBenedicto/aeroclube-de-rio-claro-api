@@ -116,11 +116,11 @@ describe('buildRemessaLines', () => {
   });
 
   describe('Segmento P com juros configurados', () => {
-    it('has interest code 2 and date=due_date when sicoob_juros>0 and prazo=0', () => {
+    it('has interest code 2 and date=due_date+1 when sicoob_juros>0 and prazo=0', () => {
       const settingsWithJuros = { ...mockSettings, sicoob_juros: 1, sicoob_juros_prazo: 0 };
       const linesWithJuros = buildRemessaLines(settingsWithJuros as any, [mockBill as any], generationDate);
       expect(linesWithJuros[2].charAt(117)).toBe('2');
-      expect(linesWithJuros[2].substring(118, 126)).toBe('15062026'); // due_date
+      expect(linesWithJuros[2].substring(118, 126)).toBe('16062026'); // due_date + 1 (must be > due_date)
     });
     it('has interest date=due_date+prazo when sicoob_juros>0 and prazo=5', () => {
       const settingsWithPrazo = { ...mockSettings, sicoob_juros: 1, sicoob_juros_prazo: 5 };
