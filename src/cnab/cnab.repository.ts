@@ -28,7 +28,14 @@ export class CnabRepository {
   markBillPaid(id: number, paidAt: Date) {
     return this.prisma.bill.update({
       where: { id },
-      data: { paid_at: paidAt },
+      data: { paid_at: paidAt, status: 'paid', payment_source: 'cnab' },
+    });
+  }
+
+  markBillsPendingCnab(ids: number[]) {
+    return this.prisma.bill.updateMany({
+      where: { id: { in: ids }, status: 'open' },
+      data: { status: 'pending_cnab' },
     });
   }
 
