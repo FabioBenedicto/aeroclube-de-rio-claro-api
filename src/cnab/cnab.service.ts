@@ -55,6 +55,7 @@ export class CnabService {
     const content = lines.join('\r\n') + '\r\n';
 
     await this.repo.incrementRemessaSequence();
+    await this.repo.markBillsPendingCnab(dto.bill_ids);
 
     return iconv.encode(content, 'win1252');
   }
