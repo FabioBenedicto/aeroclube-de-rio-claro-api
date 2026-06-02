@@ -10,6 +10,7 @@ type SicoobSettings = {
   sicoob_cnpj: string;
   sicoob_nome_empresa: string;
   sicoob_remessa_sequence: number;
+  sicoob_juros: number;
 };
 
 type BillWithCustomer = {
@@ -124,7 +125,7 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     formatDate(bill.issue_date) +            // 110-117 data emissão
     '2' +                                    // 118 código juros taxa mensal
     '00000000' +                             // 119-126 data juros mora
-    '000000000000000' +                      // 127-141 juros mora (15 chars = 13+2 decimais)
+    formatValue(s.sicoob_juros, 15) +        // 127-141 juros mora % mensal (15 chars = 13+2 decimais)
     '0' +                                    // 142 cód desconto 1
     '00000000' +                             // 143-150 data desconto 1
     '000000000000000' +                      // 151-165 desconto 1 (15 chars)

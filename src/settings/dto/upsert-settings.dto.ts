@@ -71,4 +71,11 @@ export class UpsertSettingsDto {
   @IsString()
   @IsOptional()
   sicoob_nome_empresa?: string;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  @Type(() => Number)
+  sicoob_juros?: number;
 }
