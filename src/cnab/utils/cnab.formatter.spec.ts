@@ -39,11 +39,17 @@ describe('alphaPad', () => {
 });
 
 describe('formatDate', () => {
-  it('returns DDMMAAAA format', () => {
-    expect(formatDate(new Date(2026, 4, 31))).toBe('31052026'); // month is 0-indexed
+  it('returns DDMMAAAA format for UTC midnight dates (Prisma @db.Date output)', () => {
+    expect(formatDate(new Date(Date.UTC(2026, 4, 31)))).toBe('31052026');
   });
   it('pads single-digit day and month', () => {
-    expect(formatDate(new Date(2026, 0, 5))).toBe('05012026');
+    expect(formatDate(new Date(Date.UTC(2026, 0, 5)))).toBe('05012026');
+  });
+  it('does not shift date back in negative UTC offsets (e.g. Brazil UTC-3)', () => {
+    // Prisma returns @db.Date as UTC midnight strings: new Date('2026-06-15') = 2026-06-15T00:00:00.000Z
+    // In UTC-3, getDate() would return 14 (wrong). getUTCDate() returns 15 (correct).
+    expect(formatDate(new Date('2026-06-15'))).toBe('15062026');
+    expect(formatDate(new Date('2026-01-01'))).toBe('01012026');
   });
 });
 

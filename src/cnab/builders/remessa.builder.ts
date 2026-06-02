@@ -128,7 +128,7 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     (() => {
       if (s.sicoob_juros_prazo > 0) {
         const d = new Date(bill.due_date);
-        d.setDate(d.getDate() + s.sicoob_juros_prazo);
+        d.setUTCDate(d.getUTCDate() + s.sicoob_juros_prazo);
         return formatDate(d);
       }
       return '00000000';

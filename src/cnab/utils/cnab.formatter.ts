@@ -8,9 +8,9 @@ export function alphaPad(value: string | null | undefined, length: number): stri
 }
 
 export function formatDate(date: Date): string {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const yyyy = String(date.getFullYear());
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const yyyy = String(date.getUTCFullYear());
   return `${dd}${mm}${yyyy}`;
 }
 

@@ -15,8 +15,8 @@ const mockSettings = {
 const mockBill = {
   id: 42,
   total_amount: { toString: () => '150.00' },
-  due_date: new Date(2026, 5, 15),   // 15/06/2026
-  issue_date: new Date(2026, 4, 31), // 31/05/2026
+  due_date: new Date(Date.UTC(2026, 5, 15)),   // 15/06/2026 — Prisma @db.Date as UTC midnight
+  issue_date: new Date(Date.UTC(2026, 4, 31)), // 31/05/2026 — Prisma @db.Date as UTC midnight
   customer: {
     cpf: '123.456.789-00',
     name: 'JOAO DA SILVA',
