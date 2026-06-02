@@ -1,26 +1,29 @@
 import { Injectable } from '@nestjs/common';
+import { BillStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+
+const billInclude = { customer: true };
 
 @Injectable()
 export class InvoicesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.invoice.findMany({
-      orderBy: { issue_date: 'desc' },
-      include: { customer: true, receivables: true },
+  findMany(status?: BillStatus) {
+    return this.prisma.bill.findMany({
+      where: status ? { status } : undefined,
+      include: billInclude,
+      orderBy: { created_at: 'desc' },
     });
   }
 
   findById(id: number) {
-    return this.prisma.invoice.findUnique({
+    return this.prisma.bill.findUnique({
       where: { id },
-      include: { customer: true, receivables: { include: { payments: true } } },
+      include: billInclude,
     });
   }
 
-  update(id: number, data: Prisma.InvoiceUpdateInput) {
-    return this.prisma.invoice.update({ where: { id }, data });
+  update(id: number, data: Parameters<PrismaService['bill']['update']>[0]['data']) {
+    return this.prisma.bill.update({ where: { id }, data });
   }
 }

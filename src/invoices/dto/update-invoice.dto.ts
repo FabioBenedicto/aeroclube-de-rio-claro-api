@@ -1,13 +1,13 @@
-import { IsString, IsDateString, IsOptional } from 'class-validator';
+import { IsIn, IsDateString, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateInvoiceDto {
-  @ApiPropertyOptional({ example: 'paid', enum: ['open', 'paid', 'cancelled'] })
-  @IsString()
+  @ApiPropertyOptional({ example: 'cancelled', enum: ['cancelled'] })
+  @IsIn(['cancelled'])
   @IsOptional()
-  status?: string;
+  status?: 'cancelled';
 
-  @ApiPropertyOptional({ example: '2024-02-01' })
+  @ApiPropertyOptional({ example: '2026-07-01' })
   @IsDateString()
   @IsOptional()
   due_date?: string;
