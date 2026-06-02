@@ -30,6 +30,7 @@ export class SettingsRepository {
       ...(dto.sicoob_cnpj !== undefined && { sicoob_cnpj: dto.sicoob_cnpj }),
       ...(dto.sicoob_nome_empresa !== undefined && { sicoob_nome_empresa: dto.sicoob_nome_empresa }),
       ...(dto.sicoob_juros !== undefined && { sicoob_juros: dto.sicoob_juros }),
+      ...(dto.sicoob_juros_prazo !== undefined && { sicoob_juros_prazo: dto.sicoob_juros_prazo }),
     };
 
     const data: Prisma.SettingsUpdateInput = { ...base, ...sicoob };

@@ -11,6 +11,7 @@ type SicoobSettings = {
   sicoob_nome_empresa: string;
   sicoob_remessa_sequence: number;
   sicoob_juros: number;
+  sicoob_juros_prazo: number;
 };
 
 type BillWithCustomer = {
@@ -124,7 +125,14 @@ function buildSegmentoP(s: SicoobSettings, bill: BillWithCustomer, seq: number, 
     'N' +                                    // 109 aceite não aceite
     formatDate(bill.issue_date) +            // 110-117 data emissão
     '2' +                                    // 118 código juros taxa mensal
-    '00000000' +                             // 119-126 data juros mora
+    (() => {
+      if (s.sicoob_juros_prazo > 0) {
+        const d = new Date(bill.due_date);
+        d.setDate(d.getDate() + s.sicoob_juros_prazo);
+        return formatDate(d);
+      }
+      return '00000000';
+    })() +                                   // 119-126 data juros mora (00000000 = no vencimento)
     formatValue(s.sicoob_juros, 15) +        // 127-141 juros mora % mensal (15 chars = 13+2 decimais)
     '0' +                                    // 142 cód desconto 1
     '00000000' +                             // 143-150 data desconto 1

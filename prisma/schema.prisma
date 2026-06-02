@@ -29,6 +29,7 @@ model Settings {
   sicoob_nome_empresa       String? @db.VarChar(30)
   sicoob_remessa_sequence   Int     @default(0)
   sicoob_juros              Decimal @default(0) @db.Decimal(5, 2)
+  sicoob_juros_prazo        Int     @default(0)
 
   @@map("settings")
 }

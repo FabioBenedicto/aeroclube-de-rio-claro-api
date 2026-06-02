@@ -78,4 +78,10 @@ export class UpsertSettingsDto {
   @IsOptional()
   @Type(() => Number)
   sicoob_juros?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  sicoob_juros_prazo?: number;
 }
