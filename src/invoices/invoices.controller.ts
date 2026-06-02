@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  ParseEnumPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -32,7 +33,10 @@ export class InvoicesController {
   @RequirePermission(PERM.INVOICES.VIEW)
   @ApiOperation({ summary: 'Listar faturas' })
   @ApiQuery({ name: 'status', required: false, enum: ['open', 'pending_cnab', 'paid', 'cancelled'] })
-  findAll(@Query('status') status?: BillStatus) {
+  findAll(
+    @Query('status', new ParseEnumPipe(BillStatus, { optional: true }))
+    status?: BillStatus,
+  ) {
     return this.invoicesService.listInvoices(status);
   }
 

@@ -28,12 +28,12 @@ describe('CnabRepository', () => {
   });
 
   describe('markBillPaid', () => {
-    it('atualiza paid_at, status=paid e payment_source=cnab', async () => {
+    it('atualiza paid_at, status=paid e payment_source=cnab apenas para bills em estado aberto', async () => {
       prisma.bill.update.mockResolvedValue({ id: 1 });
       const date = new Date('2026-06-01');
       await repo.markBillPaid(1, date);
       expect(prisma.bill.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: 1, status: { in: ['open', 'pending_cnab'] } },
         data: { paid_at: date, status: 'paid', payment_source: 'cnab' },
       });
     });

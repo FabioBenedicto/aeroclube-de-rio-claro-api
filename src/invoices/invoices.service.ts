@@ -20,8 +20,10 @@ export class InvoicesService {
 
   async updateInvoice(id: number, dto: UpdateInvoiceDto) {
     const bill = await this.getInvoice(id);
-    if (dto.status === 'cancelled' && bill.status === 'paid') {
-      throw new ConflictException('Não é possível cancelar uma fatura já paga');
+    if (bill.status === 'paid' || bill.status === 'cancelled') {
+      throw new ConflictException(
+        `Não é possível alterar uma fatura com status "${bill.status}"`,
+      );
     }
     return this.repo.update(id, {
       due_date: dto.due_date ? new Date(dto.due_date) : undefined,

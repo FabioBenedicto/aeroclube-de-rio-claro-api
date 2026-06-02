@@ -90,6 +90,13 @@ describe('InvoicesService', () => {
         expect.objectContaining({ due_date: new Date('2026-07-01') }),
       );
     });
+
+    it('lança ConflictException ao tentar alterar fatura já cancelada', async () => {
+      repo.findById.mockResolvedValue(makeBill('cancelled'));
+      await expect(
+        service.updateInvoice(1, { due_date: '2026-07-01' }),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('payInvoice', () => {
