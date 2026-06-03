@@ -1,4 +1,6 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { join } from 'path';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import * as iconv from 'iconv-lite';
 import { CnabRepository } from './cnab.repository';
 import { GenerateRemessaDto } from './dto/generate-remessa.dto';
@@ -9,7 +11,7 @@ import { parseRetorno, RetornoResult } from './parsers/retorno.parser';
 export class CnabService {
   constructor(private readonly repo: CnabRepository) {}
 
-  async generateRemessa(dto: GenerateRemessaDto): Promise<Buffer> {
+  async generateRemessa(dto: GenerateRemessaDto) {
     const settings = await this.repo.getSettings();
 
     if (
@@ -28,7 +30,6 @@ export class CnabService {
     }
 
     const bills = await this.repo.findBillsByIds(dto.bill_ids);
-
     const invalidBills = bills.filter((b) => !b.due_date);
     if (invalidBills.length > 0) {
       throw new UnprocessableEntityException(
@@ -36,7 +37,9 @@ export class CnabService {
       );
     }
 
+    const seqNumber = settings.sicoob_remessa_sequence;
     const now = new Date();
+
     const lines = buildRemessaLines(
       {
         sicoob_cooperativa_prefix: settings.sicoob_cooperativa_prefix,
@@ -47,7 +50,7 @@ export class CnabService {
         sicoob_modalidade: settings.sicoob_modalidade,
         sicoob_cnpj: settings.sicoob_cnpj,
         sicoob_nome_empresa: settings.sicoob_nome_empresa,
-        sicoob_remessa_sequence: settings.sicoob_remessa_sequence,
+        sicoob_remessa_sequence: seqNumber,
         sicoob_juros: Number(settings.sicoob_juros ?? 0),
         sicoob_juros_prazo: settings.sicoob_juros_prazo ?? 0,
         sicoob_agencia: settings.sicoob_agencia,
@@ -56,14 +59,53 @@ export class CnabService {
       now,
     );
     const content = lines.join('\r\n') + '\r\n';
+    const buffer = iconv.encode(content, 'win1252');
+
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const yyyy = String(now.getUTCFullYear());
+    const filename = `remessa_${yyyy}${mm}${dd}_${seqNumber}.rem`;
+    const dir = join(process.cwd(), 'uploads', 'cnab');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, filename), buffer);
+
+    const totalAmount = bills.reduce((s, b) => s + parseFloat(String(b.total_amount)), 0);
 
     await this.repo.incrementRemessaSequence();
     await this.repo.markBillsPendingCnab(dto.bill_ids);
 
-    return iconv.encode(content, 'win1252');
+    return this.repo.saveRemessa({
+      sequence_number: seqNumber,
+      bill_ids: dto.bill_ids,
+      bill_count: dto.bill_ids.length,
+      total_amount: totalAmount,
+      file_path: `/uploads/cnab/${filename}`,
+    });
   }
 
-  async processRetorno(fileBuffer: Buffer): Promise<RetornoResult & { updated: number[] }> {
+  async downloadRemessa(id: number): Promise<{ buffer: Buffer; filename: string }> {
+    const remessa = await this.repo.findRemessa(id);
+    if (!remessa) throw new NotFoundException(`Remessa ${id} não encontrada`);
+
+    const fullPath = join(process.cwd(), remessa.file_path);
+    if (!existsSync(fullPath)) {
+      throw new NotFoundException('Arquivo de remessa não encontrado no disco');
+    }
+
+    const buffer = readFileSync(fullPath);
+    const filename = remessa.file_path.split('/').pop()!;
+    return { buffer, filename };
+  }
+
+  listRemessas(page: number, limit: number) {
+    return this.repo.listRemessas(page, limit);
+  }
+
+  listRetornos(page: number, limit: number) {
+    return this.repo.listRetornos(page, limit);
+  }
+
+  async processRetorno(fileBuffer: Buffer): Promise<RetornoResult & { updated: number[]; retorno_id: number }> {
     const content = iconv.decode(fileBuffer, 'win1252');
     const result = parseRetorno(content);
 
@@ -74,6 +116,14 @@ export class CnabService {
       else result.errors.push(`Fatura ${entry.billId} não encontrada no sistema`);
     }
 
-    return { ...result, updated };
+    const retorno = await this.repo.saveRetorno({
+      paid_ids: updated,
+      rejected_ids: result.rejected,
+      errors: result.errors,
+      paid_count: updated.length,
+      rejected_count: result.rejected.length,
+    });
+
+    return { ...result, updated, retorno_id: retorno.id };
   }
 }

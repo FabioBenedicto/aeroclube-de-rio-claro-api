@@ -1,8 +1,16 @@
 import { Test } from '@nestjs/testing';
 import { CnabService } from './cnab.service';
 import { CnabRepository } from './cnab.repository';
+import { NotFoundException } from '@nestjs/common';
 
-describe('CnabService.generateRemessa', () => {
+jest.mock('fs', () => ({
+  mkdirSync: jest.fn(),
+  writeFileSync: jest.fn(),
+  existsSync: jest.fn().mockReturnValue(true),
+  readFileSync: jest.fn().mockReturnValue(Buffer.from('mock-file')),
+}));
+
+describe('CnabService', () => {
   let service: CnabService;
   let repo: jest.Mocked<CnabRepository>;
 
@@ -16,13 +24,16 @@ describe('CnabService.generateRemessa', () => {
     sicoob_cnpj: '12345678000190',
     sicoob_nome_empresa: 'AEROCLUBE',
     sicoob_remessa_sequence: 1,
+    sicoob_juros: 0,
+    sicoob_juros_prazo: 0,
+    sicoob_agencia: null,
   };
 
   const mockBill = {
     id: 1,
     total_amount: { toString: () => '100.00' },
-    due_date: new Date('2026-06-30'),
-    issue_date: new Date('2026-06-01'),
+    due_date: new Date(Date.UTC(2026, 6, 30)),
+    issue_date: new Date(Date.UTC(2026, 5, 1)),
     customer: {
       cpf: '12345678900',
       name: 'JOAO SILVA',
@@ -32,6 +43,16 @@ describe('CnabService.generateRemessa', () => {
       state: 'SP',
       zip_code: '13500000',
     },
+  };
+
+  const mockRemessa = {
+    id: 1,
+    sequence_number: 1,
+    bill_ids: [1],
+    bill_count: 1,
+    total_amount: 100,
+    file_path: '/uploads/cnab/remessa_20260602_1.rem',
+    created_at: new Date(),
   };
 
   beforeEach(async () => {
@@ -45,6 +66,10 @@ describe('CnabService.generateRemessa', () => {
             findBillsByIds: jest.fn(),
             incrementRemessaSequence: jest.fn(),
             markBillsPendingCnab: jest.fn(),
+            saveRemessa: jest.fn(),
+            saveRetorno: jest.fn(),
+            markBillPaid: jest.fn(),
+            findRemessa: jest.fn(),
           },
         },
       ],
@@ -53,21 +78,61 @@ describe('CnabService.generateRemessa', () => {
     repo = module.get(CnabRepository);
   });
 
-  it('chama markBillsPendingCnab com os ids dos bills após gerar remessa', async () => {
-    repo.getSettings.mockResolvedValue(mockSettings as any);
-    repo.findBillsByIds.mockResolvedValue([mockBill as any]);
-    repo.incrementRemessaSequence.mockResolvedValue(mockSettings as any);
-    repo.markBillsPendingCnab.mockResolvedValue(undefined as any);
+  describe('generateRemessa', () => {
+    it('salva arquivo, chama saveRemessa e retorna CnabRemessa', async () => {
+      repo.getSettings.mockResolvedValue(mockSettings as any);
+      repo.findBillsByIds.mockResolvedValue([mockBill as any]);
+      repo.incrementRemessaSequence.mockResolvedValue(undefined as any);
+      repo.markBillsPendingCnab.mockResolvedValue(undefined as any);
+      repo.saveRemessa.mockResolvedValue(mockRemessa as any);
 
-    await service.generateRemessa({ bill_ids: [1] });
+      const result = await service.generateRemessa({ bill_ids: [1] });
 
-    expect(repo.markBillsPendingCnab).toHaveBeenCalledWith([1]);
+      expect(repo.saveRemessa).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence_number: 1, bill_ids: [1], bill_count: 1 }),
+      );
+      expect(result).toEqual(mockRemessa);
+    });
+
+    it('chama markBillsPendingCnab com os ids', async () => {
+      repo.getSettings.mockResolvedValue(mockSettings as any);
+      repo.findBillsByIds.mockResolvedValue([mockBill as any]);
+      repo.incrementRemessaSequence.mockResolvedValue(undefined as any);
+      repo.markBillsPendingCnab.mockResolvedValue(undefined as any);
+      repo.saveRemessa.mockResolvedValue(mockRemessa as any);
+      await service.generateRemessa({ bill_ids: [1] });
+      expect(repo.markBillsPendingCnab).toHaveBeenCalledWith([1]);
+    });
+
+    it('lança UnprocessableEntityException se settings incompletos', async () => {
+      repo.getSettings.mockResolvedValue(null);
+      await expect(service.generateRemessa({ bill_ids: [1] })).rejects.toThrow('Configurações Sicoob incompletas');
+    });
   });
 
-  it('lança UnprocessableEntityException se settings estiverem incompletos', async () => {
-    repo.getSettings.mockResolvedValue(null);
-    await expect(service.generateRemessa({ bill_ids: [1] })).rejects.toThrow(
-      'Configurações Sicoob incompletas',
-    );
+  describe('downloadRemessa', () => {
+    it('retorna buffer e filename quando remessa existe', async () => {
+      repo.findRemessa.mockResolvedValue(mockRemessa as any);
+      const result = await service.downloadRemessa(1);
+      expect(result.filename).toBe('remessa_20260602_1.rem');
+      expect(result.buffer).toBeDefined();
+    });
+
+    it('lança NotFoundException quando remessa não existe', async () => {
+      repo.findRemessa.mockResolvedValue(null);
+      await expect(service.downloadRemessa(99)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('processRetorno', () => {
+    it('chama saveRetorno e retorna retorno_id', async () => {
+      const fakeRetorno = { id: 5, paid_count: 0, rejected_count: 0 };
+      repo.saveRetorno.mockResolvedValue(fakeRetorno as any);
+      const emptyContent = ['756' + '0000' + '0', '756' + '9999' + '9']
+        .map(l => l.padEnd(240, ' ')).join('\r\n');
+      const result = await service.processRetorno(Buffer.from(emptyContent));
+      expect(result.retorno_id).toBe(5);
+      expect(repo.saveRetorno).toHaveBeenCalled();
+    });
   });
 });
