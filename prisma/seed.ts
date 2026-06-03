@@ -119,21 +119,24 @@ async function main() {
     },
   ];
   for (const c of customersData) {
-    await prisma.customer.upsert({
+    await prisma.person.upsert({
       where: { cpf: c.cpf },
       update: {},
       create: c,
     });
   }
 
-  const customers = await prisma.customer.findMany({ orderBy: { id: 'asc' } });
+  const customers = await prisma.person.findMany({ orderBy: { id: 'asc' } });
   const byName = (name: string) => customers.find((c) => c.name === name)!;
 
   // Instructors (Rafael, Diego, Juliana)
   for (const name of ['Rafael Ozório', 'Diego Fontana', 'Juliana Ribeiro']) {
     const c = byName(name);
-    const exists = await prisma.instructor.findFirst({ where: { customer_id: c.id } });
-    if (!exists) await prisma.instructor.create({ data: { customer_id: c.id } });
+    const exists = await prisma.instructor.findFirst({
+      where: { customer_id: c.id },
+    });
+    if (!exists)
+      await prisma.instructor.create({ data: { customer_id: c.id } });
   }
 
   // Students (Helena, Beatriz, André, Marina)

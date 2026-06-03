@@ -51,7 +51,7 @@ export class ReceivablesRepository {
       const range: Prisma.DateTimeFilter = {};
       if (dateFrom) range.gte = dateFrom;
       if (dateTo) range.lte = endOfDay(dateTo);
-      AND.push({ expiration_date: range });
+      AND.push({ created_at: range });
     }
 
     const where = AND.length > 0 ? { AND } : undefined;
@@ -60,10 +60,7 @@ export class ReceivablesRepository {
       customer: true,
       company: true,
       flight: { include: { plane: true } },
-      instructor: { include: { customer: true } },
       plane: true,
-      partner: { include: { customer: true } },
-      employee: { include: { customer: true } },
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -80,6 +77,7 @@ export class ReceivablesRepository {
       include: {
         customer: true,
         company: true,
+        flight: { include: { plane: true, customer: true } },
         instructor: { include: { customer: true } },
         plane: true,
         partner: { include: { customer: true } },
@@ -90,32 +88,32 @@ export class ReceivablesRepository {
   }
 
   create(dto: CreateReceivableDto) {
-    const { client_id, company_id, bill_id, instructor_id, plane_id, partner_id, employee_id, expiration_date, recurrence, occurrences, ...fields } = dto;
+    const { client_id, company_id, bill_id, plane_id, flight_id, instructor_id, partner_id, employee_id, expiration_date, recurrence, occurrences, ...fields } = dto;
 
     const include = {
       customer: true, company: true,
-      instructor: { include: { customer: true } }, plane: true,
-      partner: { include: { customer: true } }, employee: { include: { customer: true } },
+      flight: { include: { plane: true } }, plane: true,
     };
     const relations = {
       ...(client_id && { customer: { connect: { id: client_id } } }),
       ...(company_id && { company: { connect: { id: company_id } } }),
       ...(bill_id && { bill: { connect: { id: bill_id } } }),
-      ...(instructor_id && { instructor: { connect: { id: instructor_id } } }),
       ...(plane_id && { plane: { connect: { id: plane_id } } }),
+      ...(flight_id && { flight: { connect: { id: flight_id } } }),
+      ...(instructor_id && { instructor: { connect: { id: instructor_id } } }),
       ...(partner_id && { partner: { connect: { id: partner_id } } }),
       ...(employee_id && { employee: { connect: { id: employee_id } } }),
     };
 
     if (!recurrence) {
       return this.prisma.receivable.create({
-        data: { ...fields, expiration_date: new Date(expiration_date), ...relations },
+        data: { ...fields, ...(expiration_date && { expiration_date: new Date(expiration_date) }), ...relations },
         include,
       });
     }
 
     const dates = Array.from({ length: occurrences! }, (_, i) => {
-      const d = new Date(expiration_date);
+      const d = new Date(expiration_date!);
       if (recurrence === Recurrence.Weekly) d.setDate(d.getDate() + i * 7);
       else if (recurrence === Recurrence.Monthly) d.setMonth(d.getMonth() + i);
       else d.setFullYear(d.getFullYear() + i);
@@ -138,7 +136,7 @@ export class ReceivablesRepository {
   }
 
   update(id: number, dto: UpdateReceivableDto) {
-    const { company_id, bill_id, instructor_id, plane_id, partner_id, employee_id, expiration_date, ...fields } = dto;
+    const { company_id, bill_id, plane_id, flight_id, instructor_id, partner_id, employee_id, expiration_date, ...fields } = dto;
     return this.prisma.receivable.update({
       where: { id },
       data: {
@@ -150,11 +148,14 @@ export class ReceivablesRepository {
         ...(bill_id !== undefined && {
           bill: bill_id ? { connect: { id: bill_id } } : { disconnect: true },
         }),
-        ...(instructor_id !== undefined && {
-          instructor: instructor_id ? { connect: { id: instructor_id } } : { disconnect: true },
-        }),
         ...(plane_id !== undefined && {
           plane: plane_id ? { connect: { id: plane_id } } : { disconnect: true },
+        }),
+        ...(flight_id !== undefined && {
+          flight: flight_id ? { connect: { id: flight_id } } : { disconnect: true },
+        }),
+        ...(instructor_id !== undefined && {
+          instructor: instructor_id ? { connect: { id: instructor_id } } : { disconnect: true },
         }),
         ...(partner_id !== undefined && {
           partner: partner_id ? { connect: { id: partner_id } } : { disconnect: true },
@@ -165,8 +166,7 @@ export class ReceivablesRepository {
       },
       include: {
         customer: true, company: true,
-        instructor: { include: { customer: true } }, plane: true,
-        partner: { include: { customer: true } }, employee: { include: { customer: true } },
+        flight: { include: { plane: true, customer: true } }, plane: true,
       },
     });
   }
@@ -190,6 +190,13 @@ export class ReceivablesRepository {
             status: 0,
           },
         });
+
+        if (receivable.product === 'credito' && receivable.client_id && payment.payment_method !== 'Crédito') {
+          await tx.person.update({
+            where: { id: receivable.client_id },
+            data: { credit_balance: { decrement: payment.amount_received.toNumber() } },
+          });
+        }
       }
 
       return tx.receivablePayment.delete({ where: { id: paymentId } });
@@ -219,7 +226,7 @@ export class ReceivablesRepository {
       let totalApplied = new Decimal(0);
 
       if (dto.use_credit && receivable.client_id) {
-        const customer = await tx.customer.findUnique({
+        const customer = await tx.person.findUnique({
           where: { id: receivable.client_id },
           select: { credit_balance: true },
         });
@@ -227,7 +234,7 @@ export class ReceivablesRepository {
         const creditToApply = Decimal.min(creditAvailable, outstanding);
 
         if (creditToApply.gt(0)) {
-          await tx.customer.update({
+          await tx.person.update({
             where: { id: receivable.client_id },
             data: { credit_balance: { decrement: creditToApply.toNumber() } },
           });
@@ -266,6 +273,13 @@ export class ReceivablesRepository {
         where: { id: receivableId },
         data: { amount_received: newAmountReceived, status: newStatus },
       });
+
+      if (receivable.product === 'credito' && receivable.client_id && cashAmount.gt(0)) {
+        await tx.person.update({
+          where: { id: receivable.client_id },
+          data: { credit_balance: { increment: cashAmount.toNumber() } },
+        });
+      }
 
       return {
         payment: cashPayment,

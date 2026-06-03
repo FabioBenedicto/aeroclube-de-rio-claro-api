@@ -7,7 +7,7 @@ export class CreditsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getCustomerCredits(customerId: number) {
-    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    const customer = await this.prisma.person.findUnique({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Cliente ${customerId} não encontrado`);
     const movements = await this.prisma.receivablePayment.findMany({
       where: { receivable: { client_id: customerId } },
@@ -23,9 +23,9 @@ export class CreditsService {
   }
 
   async addCredit(customerId: number, dto: AddCreditDto) {
-    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    const customer = await this.prisma.person.findUnique({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Cliente ${customerId} não encontrado`);
-    const updated = await this.prisma.customer.update({
+    const updated = await this.prisma.person.update({
       where: { id: customerId },
       data: { flight_hour_balance: { increment: dto.amount } },
     });

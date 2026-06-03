@@ -7,7 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { FlightsModule } from './flights/flights.module';
 import { ReceivablesModule } from './receivables/receivables.module';
 import { PlanesModule } from './planes/planes.module';
-import { CustomersModule } from './customers/customers.module';
+import { PeoplesModule } from './peoples/peoples.module';
 import { PayablesModule } from './payables/payables.module';
 import { BillsModule } from './bills/bills.module';
 import { CreditsModule } from './credits/credits.module';
@@ -28,7 +28,7 @@ import { InvoicesModule } from './invoices/invoices.module';
     FlightsModule,
     ReceivablesModule,
     PlanesModule,
-    CustomersModule,
+    PeoplesModule,
     PayablesModule,
     BillsModule,
     CreditsModule,

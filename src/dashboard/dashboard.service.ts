@@ -17,11 +17,11 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.receivable.aggregate({ _sum: { total_amount: true } }),
       this.prisma.receivable.aggregate({ where: { status: 0 }, _sum: { total_amount: true } }),
-      this.prisma.payable.aggregate({ _sum: { total_amount: true } }),
-      this.prisma.payable.aggregate({ where: { status: 'open' }, _sum: { total_amount: true } }),
+      this.prisma.payable.aggregate({ _sum: { amount: true } }),
+      this.prisma.payable.aggregate({ where: { status: 'open' }, _sum: { amount: true } }),
       this.prisma.flight.count({ where: { start_date: { gte: new Date(new Date().setHours(0,0,0,0)) } } }),
-      this.prisma.flight.count({ where: { status: 'in-flight' } }),
-      this.prisma.customer.count(),
+      this.prisma.flight.count({ where: { end_date: null } }),
+      this.prisma.person.count(),
     ]);
 
     return {
@@ -30,8 +30,8 @@ export class DashboardService {
         open: openReceivables._sum.total_amount ?? 0,
       },
       payables: {
-        total: totalPayables._sum.total_amount ?? 0,
-        open: openPayables._sum.total_amount ?? 0,
+        total: totalPayables._sum.amount ?? 0,
+        open: openPayables._sum.amount ?? 0,
       },
       flights: { today: flightsToday, in_flight: inFlight },
       customers: activeCustomers,

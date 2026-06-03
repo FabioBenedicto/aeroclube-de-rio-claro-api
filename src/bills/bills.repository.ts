@@ -142,7 +142,7 @@ export class BillsRepository {
   }
 
   async createBoleto(dto: import('./dto/create-boleto-bill.dto').CreateBoletoBillDto) {
-    const customer = await this.prisma.customer.findUnique({ where: { id: dto.customer_id } });
+    const customer = await this.prisma.person.findUnique({ where: { id: dto.customer_id } });
     if (!customer) throw new NotFoundException(`Cliente ${dto.customer_id} não encontrado`);
     return this.prisma.bill.create({
       data: {

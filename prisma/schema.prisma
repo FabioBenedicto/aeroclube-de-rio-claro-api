@@ -31,6 +31,7 @@ model Settings {
   sicoob_remessa_sequence   Int     @default(0)
   sicoob_juros              Decimal @default(0) @db.Decimal(5, 2)
   sicoob_juros_prazo        Int     @default(0)
+  sicoob_juros_tipo         String  @default("2") @db.VarChar(1)
 
   @@map("settings")
 }
@@ -49,7 +50,7 @@ model User {
   @@map("users")
 }
 
-model Customer {
+model Person {
   id                  Int      @id @default(autoincrement())
   cpf                 String   @unique @db.VarChar(14)
   name                String   @db.VarChar(100)
@@ -74,13 +75,13 @@ model Customer {
   receivables Receivable[]
   payables    Payable[]
 
-  @@map("customer")
+  @@map("peoples")
 }
 
 model Instructor {
   id          Int      @id @default(autoincrement())
   customer_id Int
-  customer    Customer @relation(fields: [customer_id], references: [id])
+  customer    Person   @relation(fields: [customer_id], references: [id])
 
   flights     Flight[]
   payables    Payable[]
@@ -99,7 +100,7 @@ model Partner {
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
-  customer     Customer     @relation(fields: [customer_id], references: [id])
+  customer     Person       @relation(fields: [customer_id], references: [id])
   receivables  Receivable[]
   payables     Payable[]
 
@@ -110,7 +111,7 @@ model Student {
   id          Int      @id @default(autoincrement())
   customer_id Int
 
-  customer Customer @relation(fields: [customer_id], references: [id])
+  customer Person   @relation(fields: [customer_id], references: [id])
 
   @@map("student")
 }
@@ -119,7 +120,7 @@ model Employee {
   id          Int      @id @default(autoincrement())
   customer_id Int
 
-  customer     Customer     @relation(fields: [customer_id], references: [id])
+  customer     Person       @relation(fields: [customer_id], references: [id])
   receivables  Receivable[]
   payables     Payable[]
 
@@ -158,7 +159,7 @@ model Flight {
   calculation_breakdown Json?
 
   plane      Plane       @relation(fields: [plane_id], references: [id])
-  customer   Customer    @relation(fields: [customer_id], references: [id])
+  customer   Person      @relation(fields: [customer_id], references: [id])
   instructor Instructor? @relation(fields: [instructor_id], references: [id])
 
   receivables Receivable[]
@@ -186,7 +187,7 @@ model Bill {
   created_at       DateTime   @default(now())
   nota_fiscal_path String?
 
-  customer            Customer            @relation(fields: [customer_id], references: [id])
+  customer            Person              @relation(fields: [customer_id], references: [id])
   receivable_payments ReceivablePayment[]
 
   @@map("bills")
@@ -236,7 +237,7 @@ model Receivable {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
-  customer   Customer?   @relation(fields: [client_id], references: [id])
+  customer   Person?     @relation(fields: [client_id], references: [id])
   company    Company?    @relation(fields: [company_id], references: [id])
   flight     Flight?     @relation(fields: [flight_id], references: [id], onDelete: Cascade)
   instructor Instructor? @relation(fields: [instructor_id], references: [id])
@@ -282,7 +283,7 @@ model Payable {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
-  customer   Customer?      @relation(fields: [client_id], references: [id])
+  customer   Person?        @relation(fields: [client_id], references: [id])
   company    Company?       @relation(fields: [company_id], references: [id])
   instructor Instructor?    @relation(fields: [instructor_id], references: [id])
   plane      Plane?         @relation(fields: [plane_id], references: [id])
