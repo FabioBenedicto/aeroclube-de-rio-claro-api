@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { UsersRepository } from './users.repository';
@@ -46,9 +46,13 @@ export class UsersService {
     return { ...user!, permissions: user!.permissions.map((p) => p.permission) };
   }
 
-  async update(id: number, dto: UpdateUserDto) {
+  async update(id: number, dto: UpdateUserDto, requesterId?: number) {
     const existing = await this.usersRepository.findById(id);
     if (!existing) throw new NotFoundException('Usuário não encontrado');
+
+    if (requesterId !== undefined && requesterId !== id && existing.role === Role.ADMIN) {
+      throw new ForbiddenException('Não é possível editar outro administrador');
+    }
 
     const data: Partial<{ name: string; email: string; password: string; role: Role }> = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -61,8 +65,28 @@ export class UsersService {
     return { ...user!, permissions: user!.permissions.map((p) => p.permission) };
   }
 
+  async updateMe(id: number, dto: { name?: string; email?: string; password?: string; currentPassword?: string }) {
+    if (dto.password) {
+      const user = await this.usersRepository.findById(id);
+      if (!user) throw new NotFoundException('Usuário não encontrado');
+      if (!dto.currentPassword) throw new BadRequestException('Informe a senha atual para alterar a senha');
+      const valid = await bcrypt.compare(dto.currentPassword, user.password);
+      if (!valid) throw new UnauthorizedException('Senha atual incorreta');
+    }
+    return this.update(id, { name: dto.name, email: dto.email, password: dto.password });
+  }
+
   async remove(id: number, requesterId: number) {
     if (id === requesterId) throw new ForbiddenException('Não é possível excluir o próprio usuário');
+    const existing = await this.usersRepository.findById(id);
+    if (!existing) throw new NotFoundException('Usuário não encontrado');
+    if (existing.role === Role.ADMIN) {
+      throw new ForbiddenException('Não é possível excluir outro administrador');
+    }
+    return this.usersRepository.removeUser(id);
+  }
+
+  async removeSelf(id: number) {
     const existing = await this.usersRepository.findById(id);
     if (!existing) throw new NotFoundException('Usuário não encontrado');
     return this.usersRepository.removeUser(id);
