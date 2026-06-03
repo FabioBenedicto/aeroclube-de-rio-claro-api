@@ -10,7 +10,7 @@ import { EmployeeDto } from './employee.dto';
 export class CreatePersonDto {
   @IsString() @IsNotEmpty() cpf: string;
   @IsString() @IsNotEmpty() name: string;
-  @IsEmail() email: string;
+  @IsEmail() @IsNotEmpty() email: string;
   @IsString() @IsOptional() phone_number?: string;
   @IsNumber() @Min(0) @IsOptional() @Type(() => Number) flight_hour_balance?: number;
   @ValidateNested() @IsOptional() @Type(() => InstructorDto) instructor?: InstructorDto;
