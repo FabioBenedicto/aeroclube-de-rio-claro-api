@@ -1,40 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { DashboardRepository } from './dashboard.repository';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repo: DashboardRepository) {}
 
   async getSummary() {
-    const [
-      totalReceivables,
-      openReceivables,
-      totalPayables,
-      openPayables,
-      flightsToday,
-      inFlight,
-      activeCustomers,
-    ] = await Promise.all([
-      this.prisma.receivable.aggregate({ _sum: { total_amount: true } }),
-      this.prisma.receivable.aggregate({ where: { status: 0 }, _sum: { total_amount: true } }),
-      this.prisma.payable.aggregate({ _sum: { amount: true } }),
-      this.prisma.payable.aggregate({ where: { status: 'open' }, _sum: { amount: true } }),
-      this.prisma.flight.count({ where: { start_date: { gte: new Date(new Date().setHours(0,0,0,0)) } } }),
-      this.prisma.flight.count({ where: { end_date: null } }),
-      this.prisma.person.count(),
-    ]);
-
+    const d = await this.repo.getSummaryData();
     return {
       receivables: {
-        total: totalReceivables._sum.total_amount ?? 0,
-        open: openReceivables._sum.total_amount ?? 0,
+        total: d.totalReceivables._sum.total_amount ?? 0,
+        open: d.openReceivables._sum.total_amount ?? 0,
       },
       payables: {
-        total: totalPayables._sum.amount ?? 0,
-        open: openPayables._sum.amount ?? 0,
+        total: d.totalPayables._sum.amount ?? 0,
+        open: d.openPayables._sum.amount ?? 0,
       },
-      flights: { today: flightsToday, in_flight: inFlight },
-      customers: activeCustomers,
+      flights: { today: d.flightsToday, in_flight: d.inFlight },
+      persons: d.activePersons,
     };
   }
 }
