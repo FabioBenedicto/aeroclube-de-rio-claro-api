@@ -7,7 +7,7 @@ export class DashboardRepository {
 
   async getSummaryData() {
     const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    startOfToday.setUTCHours(0, 0, 0, 0);
 
     const [
       totalReceivables,
