@@ -40,7 +40,7 @@ export function parseRetorno(content: string): RetornoResult {
       const billId = parseInt(billIdStr, 10);
 
       if (isNaN(billId) || billId <= 0) {
-        result.errors.push(`Linha ${i + 1}: nº do documento inválido "${billIdStr}"`);
+        result.errors.push(`Line ${i + 1}: invalid document number "${billIdStr}"`);
         pendingT = null;
         continue;
       }
@@ -70,7 +70,7 @@ export function parseRetorno(content: string): RetornoResult {
       } else if (movementCode !== '02') {
         // '02' = entrada confirmada, expected and ignored
         result.errors.push(
-          `Linha ${i + 1}: movimento "${movementCode}" não processado para fatura ${pendingT.billId}`,
+          `Line ${i + 1}: movement "${movementCode}" not processed for bill ${pendingT.billId}`,
         );
       }
 

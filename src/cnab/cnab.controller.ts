@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   Query,
@@ -31,14 +32,14 @@ export class CnabController {
 
   @Post('remessa')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Gerar arquivo CNAB 240 de remessa para o Sicoob' })
+  @ApiOperation({ summary: 'Generate CNAB 240 remessa file for Sicoob' })
   generateRemessa(@Body() dto: GenerateRemessaDto) {
     return this.cnabService.generateRemessa(dto);
   }
 
   @Get('remessas')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Listar remessas CNAB geradas' })
+  @ApiOperation({ summary: 'List generated CNAB remessa files' })
   listRemessas(
     @Query('page') page = '1',
     @Query('limit') limit = '20',
@@ -48,7 +49,7 @@ export class CnabController {
 
   @Get('remessas/:id/download')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Baixar arquivo .rem de uma remessa' })
+  @ApiOperation({ summary: 'Download .rem file for a remessa' })
   async downloadRemessa(
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
@@ -62,9 +63,16 @@ export class CnabController {
     res.send(buffer);
   }
 
+  @Delete('remessas/:id')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Delete CNAB remessa and revert bills to open' })
+  deleteRemessa(@Param('id', ParseIntPipe) id: number) {
+    return this.cnabService.deleteRemessa(id);
+  }
+
   @Get('retornos')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Listar retornos CNAB processados' })
+  @ApiOperation({ summary: 'List processed CNAB retorno files' })
   listRetornos(
     @Query('page') page = '1',
     @Query('limit') limit = '20',
@@ -74,11 +82,11 @@ export class CnabController {
 
   @Post('retorno')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Processar arquivo CNAB 240 de retorno do Sicoob' })
+  @ApiOperation({ summary: 'Process CNAB 240 retorno file from Sicoob' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async processRetorno(@UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('Arquivo de retorno não enviado (campo: file)');
+    if (!file) throw new BadRequestException('Return file not provided (field: file)');
     return this.cnabService.processRetorno(file.buffer);
   }
 }

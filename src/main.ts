@@ -1,13 +1,18 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   app.setGlobalPrefix('api');
+
+  app.enableCors();
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -20,8 +25,8 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const config = new DocumentBuilder()
-    .setTitle('Aeroclube Rio Claro — Sistema Financeiro')
-    .setDescription('API REST para gestão financeira do Aeroclube de Rio Claro')
+    .setTitle('Aeroclube Rio Claro — Financial System')
+    .setDescription('REST API for financial management of Aeroclube Rio Claro')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

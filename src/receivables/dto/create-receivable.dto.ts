@@ -32,12 +32,17 @@ export class CreateReceivableDto {
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  instructor_id?: number;
+  plane_id?: number;
 
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  plane_id?: number;
+  flight_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  instructor_id?: number;
 
   @IsInt()
   @IsOptional()
@@ -67,7 +72,8 @@ export class CreateReceivableDto {
   total_amount: number;
 
   @IsDateString()
-  expiration_date: string;
+  @IsOptional()
+  expiration_date?: string;
 
   @IsString()
   @IsOptional()

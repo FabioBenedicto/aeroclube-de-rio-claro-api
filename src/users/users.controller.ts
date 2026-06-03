@@ -17,14 +17,14 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Patch('me')
-  @ApiOperation({ summary: 'Atualizar próprio perfil' })
+  @ApiOperation({ summary: 'Update own profile' })
   updateMe(@Request() req: any, @Body() dto: UpdateMeDto) {
     return this.usersService.updateMe(req.user.id, dto);
   }
 
   @Delete('me')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Excluir própria conta' })
+  @ApiOperation({ summary: 'Delete own account' })
   removeSelf(@Request() req: any) {
     return this.usersService.removeSelf(req.user.id);
   }
@@ -32,7 +32,7 @@ export class UsersController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Listar todos os usuários' })
+  @ApiOperation({ summary: 'List all users' })
   findAll() {
     return this.usersService.findAll();
   }
@@ -40,7 +40,7 @@ export class UsersController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Criar usuário' })
+  @ApiOperation({ summary: 'Create user' })
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
@@ -48,7 +48,7 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Atualizar usuário' })
+  @ApiOperation({ summary: 'Update user' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @Request() req: any) {
     return this.usersService.update(id, dto, req.user.id);
   }
@@ -57,7 +57,7 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Remover usuário' })
+  @ApiOperation({ summary: 'Remove user' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.usersService.remove(id, req.user.id);
   }

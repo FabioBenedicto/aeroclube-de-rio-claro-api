@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 import { FlightsRepository } from './flights.repository';
 import { Decimal } from '@prisma/client-runtime-utils';
+import { AircraftType } from './enums/aircraft-type.enum';
 
 const mockPlane = {
   id: 1,
@@ -16,6 +17,7 @@ const mockFlight = { id: 42, plane_id: 1, customer_id: 10 };
 
 const mockRepo = {
   findPlane: jest.fn(),
+  findSettings: jest.fn(),
   registerFlight: jest.fn(),
   findAll: jest.fn(),
   findById: jest.fn(),
@@ -36,12 +38,14 @@ describe('FlightsService', () => {
     service = module.get<FlightsService>(FlightsService);
     jest.clearAllMocks();
     mockRepo.findPlane.mockResolvedValue(mockPlane);
+    mockRepo.findSettings.mockResolvedValue(null);
     mockRepo.registerFlight.mockResolvedValue(mockFlight);
   });
 
   const baseDto = {
     plane_id: 1,
     customer_id: 10,
+    aircraft_type: AircraftType.AIRPLANE,
     type: 'solo',
     double_command: false,
     origin: 'SDRP',
@@ -64,7 +68,7 @@ describe('FlightsService', () => {
 
     const input = mockRepo.registerFlight.mock.calls[0][0];
     const receivable = input.buildReceivable(42);
-    expect(receivable.title).toBe('Voo SOLO #42');
+    expect(receivable.title).toBe('Flight 42');
     expect(receivable.flight).toEqual({ connect: { id: 42 } });
   });
 
@@ -81,14 +85,16 @@ describe('FlightsService', () => {
     expect(input.buildPayable).toBeDefined();
 
     const { payableData, installmentData } = input.buildPayable(42);
-    expect(payableData.title).toBe('Instrução voo #42');
+    expect(payableData.title).toBe('Instruction 42');
     expect(installmentData.installment_number).toBe(1);
   });
 
   it('throws NotFoundException for unknown plane', async () => {
     mockRepo.findPlane.mockResolvedValue(null);
 
-    await expect(service.registerFlight(baseDto)).rejects.toThrow(NotFoundException);
+    await expect(service.registerFlight(baseDto)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('throws BadRequestException when double_command has no instructor', async () => {
@@ -105,7 +111,9 @@ describe('FlightsService', () => {
     });
 
     const { flightData } = mockRepo.registerFlight.mock.calls[0][0];
-    expect(flightData.start_date.toISOString()).toBe('2024-01-15T17:00:00.000Z');
+    expect(flightData.start_date.toISOString()).toBe(
+      '2024-01-15T17:00:00.000Z',
+    );
     expect(flightData.end_date.toISOString()).toBe('2024-01-15T18:30:00.000Z');
   });
 

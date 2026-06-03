@@ -17,10 +17,10 @@ export class AuthService {
       include: { permissions: true },
     });
 
-    if (!user) throw new UnauthorizedException('Credenciais inválidas');
+    if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const passwordValid = await bcrypt.compare(dto.password, user.password);
-    if (!passwordValid) throw new UnauthorizedException('Credenciais inválidas');
+    if (!passwordValid) throw new UnauthorizedException('Invalid credentials');
 
     const permissions = user.permissions.map((p) => p.permission);
 

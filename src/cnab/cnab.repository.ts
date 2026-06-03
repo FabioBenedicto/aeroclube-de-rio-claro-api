@@ -16,7 +16,7 @@ export class CnabRepository {
     });
     const missing = ids.filter((id) => !bills.find((b) => b.id === id));
     if (missing.length > 0) {
-      throw new NotFoundException(`Faturas não encontradas: ${missing.join(', ')}`);
+      throw new NotFoundException(`Bills not found: ${missing.join(', ')}`);
     }
     return bills;
   }
@@ -71,6 +71,17 @@ export class CnabRepository {
 
   findRemessa(id: number) {
     return this.prisma.cnabRemessa.findUnique({ where: { id } });
+  }
+
+  deleteRemessa(id: number) {
+    return this.prisma.cnabRemessa.delete({ where: { id } });
+  }
+
+  revertBillsFromPendingCnab(ids: number[]) {
+    return this.prisma.bill.updateMany({
+      where: { id: { in: ids }, status: 'pending_cnab' },
+      data: { status: 'open' },
+    });
   }
 
   saveRetorno(data: {

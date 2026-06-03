@@ -34,7 +34,7 @@ export class CompaniesController {
     const { total } = await this.companiesService.findAll(search, dateFrom, dateTo, 1, 1);
     if (total > MAX_EXPORT_ROWS) {
       throw new BadRequestException(
-        `Existem ${total} registros. Use os filtros para reduzir para no máximo ${MAX_EXPORT_ROWS}.`,
+        `There are ${total} records. Use filters to reduce to at most ${MAX_EXPORT_ROWS}.`,
       );
     }
     const { data } = await this.companiesService.findAll(search, dateFrom, dateTo, 1, total || 1);
@@ -46,17 +46,17 @@ export class CompaniesController {
       phone: c.phone ?? '',
     }));
 
-    const buffer = await buildExcel('Empresas', [
+    const buffer = await buildExcel('Companies', [
       { header: 'ID', key: 'id', width: 10 },
-      { header: 'Nome', key: 'name', width: 35 },
+      { header: 'Name', key: 'name', width: 35 },
       { header: 'CNPJ', key: 'cnpj', width: 20 },
       { header: 'E-mail', key: 'email', width: 30 },
-      { header: 'Telefone', key: 'phone', width: 18 },
+      { header: 'Phone', key: 'phone', width: 18 },
     ], rows);
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${reportFilename('empresas.xlsx')}"`,
+      'Content-Disposition': `attachment; filename="${reportFilename('companies.xlsx')}"`,
     });
     res.send(buffer);
   }

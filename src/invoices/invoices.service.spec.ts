@@ -38,12 +38,12 @@ describe('InvoicesService', () => {
   });
 
   describe('getInvoice', () => {
-    it('lança NotFoundException quando fatura não existe', async () => {
+    it('throws NotFoundException when invoice does not exist', async () => {
       repo.findById.mockResolvedValue(null);
       await expect(service.getInvoice(99)).rejects.toThrow(NotFoundException);
     });
 
-    it('retorna a fatura quando existe', async () => {
+    it('returns the invoice when it exists', async () => {
       const bill = makeBill('open');
       repo.findById.mockResolvedValue(bill);
       await expect(service.getInvoice(1)).resolves.toEqual(bill);
@@ -51,14 +51,14 @@ describe('InvoicesService', () => {
   });
 
   describe('updateInvoice', () => {
-    it('lança ConflictException ao tentar cancelar fatura já paga', async () => {
+    it('throws ConflictException when trying to cancel an already paid invoice', async () => {
       repo.findById.mockResolvedValue(makeBill('paid'));
       await expect(service.updateInvoice(1, { status: 'cancelled' })).rejects.toThrow(
         ConflictException,
       );
     });
 
-    it('permite cancelar fatura com status open', async () => {
+    it('allows cancelling an invoice with status open', async () => {
       const bill = makeBill('open');
       repo.findById.mockResolvedValue(bill);
       repo.update.mockResolvedValue({ ...bill, status: 'cancelled' } as any);
@@ -69,7 +69,7 @@ describe('InvoicesService', () => {
       );
     });
 
-    it('permite cancelar fatura com status pending_cnab', async () => {
+    it('allows cancelling an invoice with status pending_cnab', async () => {
       const bill = makeBill('pending_cnab');
       repo.findById.mockResolvedValue(bill);
       repo.update.mockResolvedValue({ ...bill, status: 'cancelled' } as any);
@@ -80,7 +80,7 @@ describe('InvoicesService', () => {
       );
     });
 
-    it('atualiza due_date sem alterar status', async () => {
+    it('updates due_date without changing status', async () => {
       const bill = makeBill('open');
       repo.findById.mockResolvedValue(bill);
       repo.update.mockResolvedValue(bill as any);
@@ -91,7 +91,7 @@ describe('InvoicesService', () => {
       );
     });
 
-    it('lança ConflictException ao tentar alterar fatura já cancelada', async () => {
+    it('throws ConflictException when trying to update a cancelled invoice', async () => {
       repo.findById.mockResolvedValue(makeBill('cancelled'));
       await expect(
         service.updateInvoice(1, { due_date: '2026-07-01' }),
@@ -100,21 +100,21 @@ describe('InvoicesService', () => {
   });
 
   describe('payInvoice', () => {
-    it('lança ConflictException quando fatura já está paga', async () => {
+    it('throws ConflictException when invoice is already paid', async () => {
       repo.findById.mockResolvedValue(makeBill('paid'));
       await expect(service.payInvoice(1, { payment_method: 'PIX' })).rejects.toThrow(
         ConflictException,
       );
     });
 
-    it('lança ConflictException quando fatura está cancelada', async () => {
+    it('throws ConflictException when invoice is cancelled', async () => {
       repo.findById.mockResolvedValue(makeBill('cancelled'));
       await expect(service.payInvoice(1, { payment_method: 'dinheiro' })).rejects.toThrow(
         ConflictException,
       );
     });
 
-    it('grava status=paid, payment_source=manual, payment_method e paid_at', async () => {
+    it('saves status=paid, payment_source=manual, payment_method and paid_at', async () => {
       const bill = makeBill('open');
       repo.findById.mockResolvedValue(bill);
       repo.update.mockResolvedValue({ ...bill, status: 'paid' } as any);
@@ -130,7 +130,7 @@ describe('InvoicesService', () => {
       );
     });
 
-    it('usa a data de hoje quando paid_at não é fornecido', async () => {
+    it('uses today as paid_at when it is not provided', async () => {
       const bill = makeBill('pending_cnab');
       repo.findById.mockResolvedValue(bill);
       repo.update.mockResolvedValue({ ...bill, status: 'paid' } as any);

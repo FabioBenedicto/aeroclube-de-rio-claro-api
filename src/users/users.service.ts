@@ -33,7 +33,7 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const existing = await this.usersRepository.findByEmail(dto.email);
-    if (existing) throw new ConflictException('E-mail já cadastrado');
+    if (existing) throw new ConflictException('E-mail already registered');
 
     const password = await bcrypt.hash(dto.password, 10);
     const user = await this.usersRepository.createUser({
@@ -48,10 +48,10 @@ export class UsersService {
 
   async update(id: number, dto: UpdateUserDto, requesterId?: number) {
     const existing = await this.usersRepository.findById(id);
-    if (!existing) throw new NotFoundException('Usuário não encontrado');
+    if (!existing) throw new NotFoundException('User not found');
 
     if (requesterId !== undefined && requesterId !== id && existing.role === Role.ADMIN) {
-      throw new ForbiddenException('Não é possível editar outro administrador');
+      throw new ForbiddenException('Cannot edit another administrator');
     }
 
     const data: Partial<{ name: string; email: string; password: string; role: Role }> = {};
@@ -68,27 +68,27 @@ export class UsersService {
   async updateMe(id: number, dto: { name?: string; email?: string; password?: string; currentPassword?: string }) {
     if (dto.password) {
       const user = await this.usersRepository.findById(id);
-      if (!user) throw new NotFoundException('Usuário não encontrado');
-      if (!dto.currentPassword) throw new BadRequestException('Informe a senha atual para alterar a senha');
+      if (!user) throw new NotFoundException('User not found');
+      if (!dto.currentPassword) throw new BadRequestException('Provide the current password to change it');
       const valid = await bcrypt.compare(dto.currentPassword, user.password);
-      if (!valid) throw new UnauthorizedException('Senha atual incorreta');
+      if (!valid) throw new UnauthorizedException('Current password is incorrect');
     }
     return this.update(id, { name: dto.name, email: dto.email, password: dto.password });
   }
 
   async remove(id: number, requesterId: number) {
-    if (id === requesterId) throw new ForbiddenException('Não é possível excluir o próprio usuário');
+    if (id === requesterId) throw new ForbiddenException('Cannot delete your own user account');
     const existing = await this.usersRepository.findById(id);
-    if (!existing) throw new NotFoundException('Usuário não encontrado');
+    if (!existing) throw new NotFoundException('User not found');
     if (existing.role === Role.ADMIN) {
-      throw new ForbiddenException('Não é possível excluir outro administrador');
+      throw new ForbiddenException('Cannot delete another administrator');
     }
     return this.usersRepository.removeUser(id);
   }
 
   async removeSelf(id: number) {
     const existing = await this.usersRepository.findById(id);
-    if (!existing) throw new NotFoundException('Usuário não encontrado');
+    if (!existing) throw new NotFoundException('User not found');
     return this.usersRepository.removeUser(id);
   }
 }

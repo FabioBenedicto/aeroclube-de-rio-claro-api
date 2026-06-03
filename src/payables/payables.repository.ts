@@ -14,8 +14,8 @@ import { Recurrence } from './enums/recurrence.enum';
 const include = {
   customer: true,
   company: true,
-  instructor: { include: { customer: true } },
   plane: true,
+  instructor: { include: { customer: true } },
   partner: { include: { customer: true } },
   employee: { include: { customer: true } },
   payments: { orderBy: { paid_at: 'desc' as const } },
@@ -31,16 +31,32 @@ function endOfDay(d: Date): Date {
 export class PayablesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(status?: string, clientId?: number, search?: string, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20) {
+  async findAll(status?: string, clientId?: number, search?: string, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20, instructorId?: number, employeeId?: number) {
     const AND: Prisma.PayableWhereInput[] = [];
-    if (status) AND.push({ status });
+    if (status === 'overdue') {
+      AND.push({ status: { not: 'closed' } });
+      AND.push({ due_date: { lt: new Date() } });
+    } else if (status) {
+      AND.push({ status });
+    }
     if (clientId) AND.push({ client_id: clientId });
-    if (search) AND.push({ title: { contains: search, mode: 'insensitive' } });
+    if (instructorId) AND.push({ instructor_id: instructorId });
+    if (employeeId) AND.push({ employee_id: employeeId });
+    if (search) AND.push({
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { company: { name: { contains: search, mode: 'insensitive' } } },
+        { instructor: { customer: { name: { contains: search, mode: 'insensitive' } } } },
+        { partner: { customer: { name: { contains: search, mode: 'insensitive' } } } },
+        { employee: { customer: { name: { contains: search, mode: 'insensitive' } } } },
+      ],
+    });
     if (dateFrom || dateTo) {
-      const range: Prisma.DateTimeNullableFilter = {};
+      const range: Prisma.DateTimeFilter = {};
       if (dateFrom) range.gte = dateFrom;
       if (dateTo) range.lte = endOfDay(dateTo);
-      AND.push({ due_date: range });
+      AND.push({ created_at: range });
     }
     const where = AND.length > 0 ? { AND } : undefined;
     const skip = (page - 1) * limit;
@@ -56,13 +72,13 @@ export class PayablesRepository {
   }
 
   create(dto: CreatePayableDto) {
-    const { client_id, company_id, instructor_id, plane_id, partner_id, employee_id, recurrence, occurrences, due_date, ...fields } = dto;
+    const { client_id, company_id, plane_id, instructor_id, partner_id, employee_id, recurrence, occurrences, due_date, ...fields } = dto;
 
     const relations = {
       ...(client_id && { customer: { connect: { id: client_id } } }),
       ...(company_id && { company: { connect: { id: company_id } } }),
-      ...(instructor_id && { instructor: { connect: { id: instructor_id } } }),
       ...(plane_id && { plane: { connect: { id: plane_id } } }),
+      ...(instructor_id && { instructor: { connect: { id: instructor_id } } }),
       ...(partner_id && { partner: { connect: { id: partner_id } } }),
       ...(employee_id && { employee: { connect: { id: employee_id } } }),
     };
@@ -99,7 +115,7 @@ export class PayablesRepository {
   }
 
   update(id: number, dto: UpdatePayableDto) {
-    const { client_id, company_id, instructor_id, plane_id, partner_id, employee_id, ...rest } = dto;
+    const { client_id, company_id, plane_id, instructor_id, partner_id, employee_id, ...rest } = dto;
     return this.prisma.payable.update({
       where: { id },
       data: {
@@ -110,11 +126,11 @@ export class PayablesRepository {
         ...(company_id !== undefined && {
           company: company_id ? { connect: { id: company_id } } : { disconnect: true },
         }),
-        ...(instructor_id !== undefined && {
-          instructor: instructor_id ? { connect: { id: instructor_id } } : { disconnect: true },
-        }),
         ...(plane_id !== undefined && {
           plane: plane_id ? { connect: { id: plane_id } } : { disconnect: true },
+        }),
+        ...(instructor_id !== undefined && {
+          instructor: instructor_id ? { connect: { id: instructor_id } } : { disconnect: true },
         }),
         ...(partner_id !== undefined && {
           partner: partner_id ? { connect: { id: partner_id } } : { disconnect: true },
@@ -145,6 +161,7 @@ export class PayablesRepository {
           where: { id: payable.id },
           data: { amount_paid: clamped, status },
         });
+
       }
 
       return tx.payablePayment.delete({ where: { id: paymentId } });
@@ -167,12 +184,12 @@ export class PayablesRepository {
       const payable = await tx.payable.findUnique({ where: { id } });
 
       if (!payable)
-        throw new NotFoundException(`Título a pagar ${id} não encontrado`);
-      if (payable.status === 'paid')
-        throw new BadRequestException('Título já está quitado');
+        throw new NotFoundException(`Payable ${id} not found`);
+      if (payable.status === 'closed')
+        throw new BadRequestException('Payable is already settled');
 
       const newPaid = payable.amount_paid.add(new Decimal(dto.amount));
-      const status = newPaid.gte(payable.amount) ? 'paid' : 'partial';
+      const status = newPaid.gte(payable.amount) ? 'closed' : 'partial';
 
       await tx.payablePayment.create({
         data: {

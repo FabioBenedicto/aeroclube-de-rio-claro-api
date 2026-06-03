@@ -52,7 +52,7 @@ export class BillsRepository {
       });
 
       if (receivables.length !== receivableIds.length) {
-        throw new NotFoundException('Um ou mais títulos não foram encontrados');
+        throw new NotFoundException('One or more receivables were not found');
       }
 
       for (const item of dto.items) {
@@ -60,7 +60,7 @@ export class BillsRepository {
         const outstanding = r.total_amount.sub(r.amount_received);
         if (new Decimal(item.amount).gt(outstanding)) {
           throw new BadRequestException(
-            `Valor para o título ${r.id} (${item.amount}) excede o saldo devedor (${outstanding})`,
+            `Amount for receivable ${r.id} (${item.amount}) exceeds the outstanding balance (${outstanding})`,
           );
         }
       }
@@ -110,7 +110,7 @@ export class BillsRepository {
         where: { id },
         include: { receivable_payments: true },
       });
-      if (!bill) throw new NotFoundException(`Fatura ${id} não encontrada`);
+      if (!bill) throw new NotFoundException(`Bill ${id} not found`);
 
       for (const payment of bill.receivable_payments) {
         const receivable = await tx.receivable.findUnique({
@@ -143,7 +143,7 @@ export class BillsRepository {
 
   async createBoleto(dto: import('./dto/create-boleto-bill.dto').CreateBoletoBillDto) {
     const customer = await this.prisma.person.findUnique({ where: { id: dto.customer_id } });
-    if (!customer) throw new NotFoundException(`Cliente ${dto.customer_id} não encontrado`);
+    if (!customer) throw new NotFoundException(`Person ${dto.customer_id} not found`);
     return this.prisma.bill.create({
       data: {
         customer: { connect: { id: dto.customer_id } },

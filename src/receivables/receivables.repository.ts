@@ -191,7 +191,7 @@ export class ReceivablesRepository {
           },
         });
 
-        if (receivable.product === 'credito' && receivable.client_id && payment.payment_method !== 'Crédito') {
+        if (receivable.product === 'credito' && receivable.client_id && payment.payment_method !== 'Credit') {
           await tx.person.update({
             where: { id: receivable.client_id },
             data: { credit_balance: { decrement: payment.amount_received.toNumber() } },
@@ -218,8 +218,8 @@ export class ReceivablesRepository {
     return this.prisma.$transaction(async (tx) => {
       const receivable = await tx.receivable.findUnique({ where: { id: receivableId } });
 
-      if (!receivable) throw new NotFoundException(`Título ${receivableId} não encontrado`);
-      if (receivable.status === 1) throw new BadRequestException('Título já está quitado');
+      if (!receivable) throw new NotFoundException(`Receivable ${receivableId} not found`);
+      if (receivable.status === 1) throw new BadRequestException('Receivable is already settled');
 
       const paymentDate = dto.payment_date ? new Date(dto.payment_date) : new Date();
       let outstanding = receivable.total_amount.sub(receivable.amount_received);
@@ -242,7 +242,7 @@ export class ReceivablesRepository {
             data: {
               receivable: { connect: { id: receivableId } },
               amount_received: creditToApply,
-              payment_method: 'Crédito',
+              payment_method: 'Credit',
               payment_date: paymentDate,
             },
           });

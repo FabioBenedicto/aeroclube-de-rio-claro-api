@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { join } from 'path';
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
 import * as iconv from 'iconv-lite';
 import { CnabRepository } from './cnab.repository';
 import { GenerateRemessaDto } from './dto/generate-remessa.dto';
@@ -25,7 +25,7 @@ export class CnabService {
       !settings?.sicoob_nome_empresa
     ) {
       throw new UnprocessableEntityException(
-        'Configurações Sicoob incompletas. Preencha em PUT /api/settings.',
+        'Sicoob settings are incomplete. Fill them in via PUT /api/settings.',
       );
     }
 
@@ -33,7 +33,7 @@ export class CnabService {
     const invalidBills = bills.filter((b) => !b.due_date);
     if (invalidBills.length > 0) {
       throw new UnprocessableEntityException(
-        `Faturas sem data de vencimento: ${invalidBills.map((b) => b.id).join(', ')}`,
+        `Bills without a due date: ${invalidBills.map((b) => b.id).join(', ')}`,
       );
     }
 
@@ -53,7 +53,7 @@ export class CnabService {
         sicoob_remessa_sequence: seqNumber,
         sicoob_juros: Number(settings.sicoob_juros ?? 0),
         sicoob_juros_prazo: settings.sicoob_juros_prazo ?? 0,
-        sicoob_agencia: settings.sicoob_agencia,
+        sicoob_juros_tipo: settings.sicoob_juros_tipo ?? '2',
       },
       bills as any,
       now,
@@ -85,11 +85,11 @@ export class CnabService {
 
   async downloadRemessa(id: number): Promise<{ buffer: Buffer; filename: string }> {
     const remessa = await this.repo.findRemessa(id);
-    if (!remessa) throw new NotFoundException(`Remessa ${id} não encontrada`);
+    if (!remessa) throw new NotFoundException(`Remessa ${id} not found`);
 
     const fullPath = join(process.cwd(), remessa.file_path);
     if (!existsSync(fullPath)) {
-      throw new NotFoundException('Arquivo de remessa não encontrado no disco');
+      throw new NotFoundException('Remessa file not found on disk');
     }
 
     const buffer = readFileSync(fullPath);
@@ -99,6 +99,19 @@ export class CnabService {
 
   listRemessas(page: number, limit: number) {
     return this.repo.listRemessas(page, limit);
+  }
+
+  async deleteRemessa(id: number) {
+    const remessa = await this.repo.findRemessa(id);
+    if (!remessa) throw new NotFoundException(`Remessa ${id} not found`);
+
+    const billIds = (remessa.bill_ids as number[]);
+    await this.repo.revertBillsFromPendingCnab(billIds);
+
+    const fullPath = join(process.cwd(), remessa.file_path);
+    if (existsSync(fullPath)) unlinkSync(fullPath);
+
+    return this.repo.deleteRemessa(id);
   }
 
   listRetornos(page: number, limit: number) {
@@ -113,7 +126,7 @@ export class CnabService {
     for (const entry of result.paid) {
       const bill = await this.repo.markBillPaid(entry.billId, entry.paymentDate).catch(() => null);
       if (bill) updated.push(entry.billId);
-      else result.errors.push(`Fatura ${entry.billId} não encontrada no sistema`);
+      else result.errors.push(`Bill ${entry.billId} not found in the system`);
     }
 
     const retorno = await this.repo.saveRetorno({

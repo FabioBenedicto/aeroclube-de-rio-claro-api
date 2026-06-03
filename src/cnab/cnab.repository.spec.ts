@@ -28,7 +28,7 @@ describe('CnabRepository', () => {
   });
 
   describe('markBillPaid', () => {
-    it('atualiza paid_at, status=paid e payment_source=cnab apenas para bills em estado aberto', async () => {
+    it('updates paid_at, status=paid and payment_source=cnab only for bills in open state', async () => {
       prisma.bill.update.mockResolvedValue({ id: 1 });
       const date = new Date('2026-06-01');
       await repo.markBillPaid(1, date);
@@ -40,7 +40,7 @@ describe('CnabRepository', () => {
   });
 
   describe('markBillsPendingCnab', () => {
-    it('atualiza apenas bills com status=open para pending_cnab', async () => {
+    it('updates only bills with status=open to pending_cnab', async () => {
       prisma.bill.updateMany.mockResolvedValue({ count: 2 });
       await repo.markBillsPendingCnab([1, 2, 3]);
       expect(prisma.bill.updateMany).toHaveBeenCalledWith({

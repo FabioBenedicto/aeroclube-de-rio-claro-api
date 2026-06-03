@@ -79,7 +79,7 @@ describe('CnabService', () => {
   });
 
   describe('generateRemessa', () => {
-    it('salva arquivo, chama saveRemessa e retorna CnabRemessa', async () => {
+    it('saves file, calls saveRemessa and returns CnabRemessa', async () => {
       repo.getSettings.mockResolvedValue(mockSettings as any);
       repo.findBillsByIds.mockResolvedValue([mockBill as any]);
       repo.incrementRemessaSequence.mockResolvedValue(undefined as any);
@@ -94,7 +94,7 @@ describe('CnabService', () => {
       expect(result).toEqual(mockRemessa);
     });
 
-    it('chama markBillsPendingCnab com os ids', async () => {
+    it('calls markBillsPendingCnab with the bill ids', async () => {
       repo.getSettings.mockResolvedValue(mockSettings as any);
       repo.findBillsByIds.mockResolvedValue([mockBill as any]);
       repo.incrementRemessaSequence.mockResolvedValue(undefined as any);
@@ -104,28 +104,28 @@ describe('CnabService', () => {
       expect(repo.markBillsPendingCnab).toHaveBeenCalledWith([1]);
     });
 
-    it('lança UnprocessableEntityException se settings incompletos', async () => {
+    it('throws UnprocessableEntityException when settings are incomplete', async () => {
       repo.getSettings.mockResolvedValue(null);
-      await expect(service.generateRemessa({ bill_ids: [1] })).rejects.toThrow('Configurações Sicoob incompletas');
+      await expect(service.generateRemessa({ bill_ids: [1] })).rejects.toThrow('Sicoob settings are incomplete');
     });
   });
 
   describe('downloadRemessa', () => {
-    it('retorna buffer e filename quando remessa existe', async () => {
+    it('returns buffer and filename when remessa exists', async () => {
       repo.findRemessa.mockResolvedValue(mockRemessa as any);
       const result = await service.downloadRemessa(1);
       expect(result.filename).toBe('remessa_20260602_1.rem');
       expect(result.buffer).toBeDefined();
     });
 
-    it('lança NotFoundException quando remessa não existe', async () => {
+    it('throws NotFoundException when remessa does not exist', async () => {
       repo.findRemessa.mockResolvedValue(null);
       await expect(service.downloadRemessa(99)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('processRetorno', () => {
-    it('chama saveRetorno e retorna retorno_id', async () => {
+    it('calls saveRetorno and returns retorno_id', async () => {
       const fakeRetorno = { id: 5, paid_count: 0, rejected_count: 0 };
       repo.saveRetorno.mockResolvedValue(fakeRetorno as any);
       const emptyContent = ['756' + '0000' + '0', '756' + '9999' + '9']

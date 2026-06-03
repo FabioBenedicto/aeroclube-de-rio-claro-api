@@ -34,7 +34,7 @@ export class BillsController {
   constructor(private readonly billsService: BillsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar faturas' })
+  @ApiOperation({ summary: 'List bills' })
   findAll(
     @Query('customer_id') customerId?: string,
     @Query('date_from') dateFrom?: string,
@@ -58,38 +58,38 @@ export class BillsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalhes da fatura' })
+  @ApiOperation({ summary: 'Get bill details' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.billsService.findOne(id);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Registrar pagamento agrupado' })
+  @ApiOperation({ summary: 'Register grouped payment (create bill)' })
   create(@Body() dto: CreateBillDto) {
     return this.billsService.create(dto);
   }
 
   @Post('boleto')
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Criar fatura de boleto (sem baixa imediata)' })
+  @ApiOperation({ summary: 'Create boleto bill (without immediate settlement)' })
   createBoleto(@Body() dto: CreateBoletoBillDto) {
     return this.billsService.createBoleto(dto);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Atualizar fatura' })
+  @ApiOperation({ summary: 'Update bill' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBillDto) {
     return this.billsService.update(id, dto);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Estornar e deletar fatura' })
+  @ApiOperation({ summary: 'Reverse and delete bill' })
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.billsService.delete(id);
   }
 
   @Post(':id/nota-fiscal')
-  @ApiOperation({ summary: 'Anexar nota fiscal à fatura' })
+  @ApiOperation({ summary: 'Attach nota fiscal to bill' })
   @UseInterceptors(FileInterceptor('file', {
     storage: notaFiscalStorage('bills'),
     fileFilter: notaFiscalFilter,
@@ -99,7 +99,7 @@ export class BillsController {
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('Nenhum arquivo enviado');
+    if (!file) throw new BadRequestException('No file uploaded');
     const bill = await this.billsService.findOne(id);
     deleteNfFile(bill.nota_fiscal_path ?? null);
     const path = buildNfPath('bills', file.filename);
@@ -108,7 +108,7 @@ export class BillsController {
 
   @Delete(':id/nota-fiscal')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remover nota fiscal da fatura' })
+  @ApiOperation({ summary: 'Remove nota fiscal from bill' })
   async deleteNotaFiscal(@Param('id', ParseIntPipe) id: number) {
     const bill = await this.billsService.findOne(id);
     deleteNfFile(bill.nota_fiscal_path ?? null);

@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsDateString,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PayerType } from '../enums/payer-type.enum';
@@ -24,12 +25,19 @@ export class UpdateReceivableDto {
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  instructor_id?: number;
+  plane_id?: number;
+
+  @IsOptional()
+  @ValidateIf(o => o.flight_id !== null)
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  flight_id?: number | null;
 
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  plane_id?: number;
+  instructor_id?: number;
 
   @IsInt()
   @IsOptional()

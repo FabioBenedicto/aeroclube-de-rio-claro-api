@@ -11,6 +11,6 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get()
-  @ApiOperation({ summary: 'KPIs financeiros e operacionais' })
+  @ApiOperation({ summary: 'Financial and operational KPIs' })
   getSummary() { return this.dashboardService.getSummary(); }
 }

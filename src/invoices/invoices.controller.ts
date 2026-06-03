@@ -31,7 +31,7 @@ export class InvoicesController {
 
   @Get()
   @RequirePermission(PERM.INVOICES.VIEW)
-  @ApiOperation({ summary: 'Listar faturas' })
+  @ApiOperation({ summary: 'List invoices' })
   @ApiQuery({ name: 'status', required: false, enum: ['open', 'pending_cnab', 'paid', 'cancelled'] })
   findAll(
     @Query('status', new ParseEnumPipe(BillStatus, { optional: true }))
@@ -42,14 +42,14 @@ export class InvoicesController {
 
   @Get(':id')
   @RequirePermission(PERM.INVOICES.VIEW)
-  @ApiOperation({ summary: 'Detalhe da fatura' })
+  @ApiOperation({ summary: 'Get invoice details' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.invoicesService.getInvoice(id);
   }
 
   @Patch(':id')
   @RequirePermission(PERM.INVOICES.UPDATE)
-  @ApiOperation({ summary: 'Atualizar fatura (data de vencimento ou cancelar)' })
+  @ApiOperation({ summary: 'Update invoice (due date or cancel)' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateInvoiceDto,
@@ -60,7 +60,7 @@ export class InvoicesController {
   @Post(':id/pay')
   @RequirePermission(PERM.INVOICES.UPDATE)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Registrar pagamento manual da fatura' })
+  @ApiOperation({ summary: 'Register manual invoice payment' })
   pay(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: PayInvoiceDto,

@@ -41,4 +41,7 @@ export const PERM = {
     UPDATE: 'companies:update',
     DELETE: 'companies:delete',
   },
+  REPORTS: {
+    VIEW: 'reports:view',
+  },
 } as const;

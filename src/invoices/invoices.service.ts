@@ -14,7 +14,7 @@ export class InvoicesService {
 
   async getInvoice(id: number) {
     const bill = await this.repo.findById(id);
-    if (!bill) throw new NotFoundException(`Fatura ${id} não encontrada`);
+    if (!bill) throw new NotFoundException(`Invoice ${id} not found`);
     return bill;
   }
 
@@ -22,7 +22,7 @@ export class InvoicesService {
     const bill = await this.getInvoice(id);
     if (bill.status === 'paid' || bill.status === 'cancelled') {
       throw new ConflictException(
-        `Não é possível alterar uma fatura com status "${bill.status}"`,
+        `Cannot update an invoice with status "${bill.status}"`,
       );
     }
     return this.repo.update(id, {
@@ -35,7 +35,7 @@ export class InvoicesService {
     const bill = await this.getInvoice(id);
     if (bill.status === 'paid' || bill.status === 'cancelled') {
       throw new ConflictException(
-        `Não é possível pagar uma fatura com status "${bill.status}"`,
+        `Cannot pay an invoice with status "${bill.status}"`,
       );
     }
     return this.repo.update(id, {

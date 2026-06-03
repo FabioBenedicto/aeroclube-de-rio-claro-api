@@ -14,7 +14,7 @@ export class BillsService {
 
   async findOne(id: number) {
     const bill = await this.repo.findById(id);
-    if (!bill) throw new NotFoundException(`Fatura ${id} não encontrada`);
+    if (!bill) throw new NotFoundException(`Bill ${id} not found`);
     return bill;
   }
 

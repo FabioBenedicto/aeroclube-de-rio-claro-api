@@ -27,12 +27,12 @@ export class CreatePayableDto {
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  instructor_id?: number;
+  plane_id?: number;
 
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  plane_id?: number;
+  instructor_id?: number;
 
   @IsInt()
   @IsOptional()

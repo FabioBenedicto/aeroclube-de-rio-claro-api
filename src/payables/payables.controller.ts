@@ -32,7 +32,7 @@ import { notaFiscalStorage, notaFiscalFilter, buildNfPath, deleteNfFile } from '
 import { ExportThrottle } from '../common/decorators/export-throttle.decorator';
 import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
 
-const P_STATUS_LABEL: Record<string, string> = { open: 'A pagar', partial: 'Parcial', closed: 'Pago' };
+const P_STATUS_LABEL: Record<string, string> = { open: 'Payable', partial: 'Partial', closed: 'Paid' };
 
 @ApiTags('payables')
 @ApiBearerAuth()
@@ -44,7 +44,7 @@ export class PayablesController {
   @Get('export')
   @RequirePermission(PERM.PAYABLES.VIEW)
   @ExportThrottle()
-  @ApiOperation({ summary: 'Exportar títulos a pagar em Excel' })
+  @ApiOperation({ summary: 'Export payables to Excel' })
   async export(
     @Query('status') status: string,
     @Query('search') search: string,
@@ -55,7 +55,7 @@ export class PayablesController {
     const { total } = await this.payablesService.findAll(status, undefined, search, dateFrom, dateTo, 1, 1);
     if (total > MAX_EXPORT_ROWS) {
       throw new BadRequestException(
-        `Existem ${total} registros. Use os filtros para reduzir para no máximo ${MAX_EXPORT_ROWS}.`,
+        `There are ${total} records. Use filters to reduce to at most ${MAX_EXPORT_ROWS}.`,
       );
     }
     const { data } = await this.payablesService.findAll(status, undefined, search, dateFrom, dateTo, 1, total || 1);
@@ -70,63 +70,65 @@ export class PayablesController {
       status: P_STATUS_LABEL[p.status] ?? p.status,
     }));
 
-    const buffer = await buildExcel('Contas a pagar', [
+    const buffer = await buildExcel('Payables', [
       { header: 'ID', key: 'id', width: 10 },
-      { header: 'Título', key: 'title', width: 35 },
-      { header: 'Tipo', key: 'product', width: 16 },
-      { header: 'Vencimento', key: 'due_date', width: 14 },
-      { header: 'Valor (R$)', key: 'amount', width: 16 },
-      { header: 'Pago (R$)', key: 'amount_paid', width: 14 },
-      { header: 'Saldo (R$)', key: 'remaining', width: 14 },
+      { header: 'Title', key: 'title', width: 35 },
+      { header: 'Type', key: 'product', width: 16 },
+      { header: 'Due Date', key: 'due_date', width: 14 },
+      { header: 'Amount (R$)', key: 'amount', width: 16 },
+      { header: 'Paid (R$)', key: 'amount_paid', width: 14 },
+      { header: 'Balance (R$)', key: 'remaining', width: 14 },
       { header: 'Status', key: 'status', width: 14 },
     ], rows);
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${reportFilename('contas-a-pagar.xlsx')}"`,
+      'Content-Disposition': `attachment; filename="${reportFilename('payables.xlsx')}"`,
     });
     res.send(buffer);
   }
 
   @Get()
   @RequirePermission(PERM.PAYABLES.VIEW)
-  @ApiOperation({ summary: 'Listar títulos a pagar' })
+  @ApiOperation({ summary: 'List payables' })
   findAll(
     @Query('status') status?: string,
     @Query('client_id') clientId?: string,
+    @Query('instructor_id') instructorId?: string,
+    @Query('employee_id') employeeId?: string,
     @Query('search') search?: string,
     @Query('date_from') dateFrom?: string,
     @Query('date_to') dateTo?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    return this.payablesService.findAll(status, clientId ? Number(clientId) : undefined, search, dateFrom, dateTo, Number(page), Number(limit));
+    return this.payablesService.findAll(status, clientId ? Number(clientId) : undefined, search, dateFrom, dateTo, Number(page), Number(limit), instructorId ? Number(instructorId) : undefined, employeeId ? Number(employeeId) : undefined);
   }
 
   @Get(':id')
   @RequirePermission(PERM.PAYABLES.VIEW)
-  @ApiOperation({ summary: 'Detalhes do título a pagar' })
+  @ApiOperation({ summary: 'Get payable details' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.payablesService.findOne(id);
   }
 
   @Post()
   @RequirePermission(PERM.PAYABLES.CREATE)
-  @ApiOperation({ summary: 'Criar título a pagar com parcelas' })
+  @ApiOperation({ summary: 'Create payable with installments' })
   create(@Body() dto: CreatePayableDto) {
     return this.payablesService.create(dto);
   }
 
   @Patch(':id')
   @RequirePermission(PERM.PAYABLES.UPDATE)
-  @ApiOperation({ summary: 'Atualizar título a pagar' })
+  @ApiOperation({ summary: 'Update payable' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePayableDto) {
     return this.payablesService.update(id, dto);
   }
 
   @Patch(':id/payments')
   @RequirePermission(PERM.PAYABLES.UPDATE)
-  @ApiOperation({ summary: 'Registrar pagamento de parcela' })
+  @ApiOperation({ summary: 'Register installment payment' })
   registerPayment(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreatePayablePaymentDto,
@@ -137,7 +139,7 @@ export class PayablesController {
   @Delete(':id')
   @RequirePermission(PERM.PAYABLES.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Excluir título a pagar' })
+  @ApiOperation({ summary: 'Delete payable' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.payablesService.remove(id);
   }
@@ -145,7 +147,7 @@ export class PayablesController {
   @Delete(':id/payments/:paymentId')
   @RequirePermission(PERM.PAYABLES.UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Estornar pagamento de título a pagar' })
+  @ApiOperation({ summary: 'Reverse payable payment' })
   deletePayment(
     @Param('id', ParseIntPipe) _id: number,
     @Param('paymentId', ParseIntPipe) paymentId: number,
@@ -155,7 +157,7 @@ export class PayablesController {
 
   @Post(':id/payments/:paymentId/nota-fiscal')
   @RequirePermission(PERM.PAYABLES.UPDATE)
-  @ApiOperation({ summary: 'Anexar nota fiscal ao pagamento' })
+  @ApiOperation({ summary: 'Attach invoice (nota fiscal) to payment' })
   @UseInterceptors(FileInterceptor('file', {
     storage: notaFiscalStorage('payable-payments'),
     fileFilter: notaFiscalFilter,
@@ -165,7 +167,7 @@ export class PayablesController {
     @Param('paymentId', ParseIntPipe) paymentId: number,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('Nenhum arquivo enviado');
+    if (!file) throw new BadRequestException('No file uploaded');
     const payment = await this.payablesService.getPayment(paymentId);
     deleteNfFile(payment.nota_fiscal_path ?? null);
     const path = buildNfPath('payable-payments', file.filename);
@@ -175,7 +177,7 @@ export class PayablesController {
   @Delete(':id/payments/:paymentId/nota-fiscal')
   @RequirePermission(PERM.PAYABLES.UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remover nota fiscal do pagamento' })
+  @ApiOperation({ summary: 'Remove invoice (nota fiscal) from payment' })
   async deletePaymentNotaFiscal(@Param('paymentId', ParseIntPipe) paymentId: number) {
     const payment = await this.payablesService.getPayment(paymentId);
     deleteNfFile(payment.nota_fiscal_path ?? null);

@@ -35,7 +35,7 @@ describe('ReceivablesService', () => {
   });
 
   it('propagates NotFoundException from repository', async () => {
-    mockRepo.registerPayment.mockRejectedValue(new NotFoundException('Título 99 não encontrado'));
+    mockRepo.registerPayment.mockRejectedValue(new NotFoundException('Receivable 99 not found'));
 
     await expect(service.registerPayment(99, { amount_received: 100 })).rejects.toThrow(NotFoundException);
   });

@@ -5,48 +5,63 @@ import {
   IsDateString,
   IsOptional,
   IsNotEmpty,
+  IsEnum,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AircraftType } from '../enums/aircraft-type.enum';
 
 export class CreateFlightDto {
-  @ApiProperty()
   @IsInt()
   plane_id: number;
 
-  @ApiProperty()
   @IsInt()
   customer_id: number;
 
-  @ApiPropertyOptional()
   @IsInt()
   @IsOptional()
   instructor_id?: number;
 
-  @ApiProperty({ example: 'solo' })
+  @IsEnum(AircraftType)
+  aircraft_type: AircraftType;
+
   @IsString()
   @IsNotEmpty()
   type: string;
 
-  @ApiProperty()
   @IsBoolean()
   double_command: boolean;
 
-  @ApiProperty({ example: 'SDRP' })
   @IsString()
   @IsNotEmpty()
   origin: string;
 
-  @ApiProperty({ example: 'SDTC' })
   @IsString()
   @IsNotEmpty()
   destination: string;
 
-  @ApiProperty({ example: '2024-01-15T14:00:00Z' })
   @IsDateString()
   start_date: string;
 
-  @ApiPropertyOptional({ example: '2024-01-15T15:30:00Z' })
   @IsDateString()
   @IsOptional()
   end_date?: string;
+
+  @IsString()
+  @IsOptional()
+  receivable_title?: string;
+
+  @IsDateString()
+  @IsOptional()
+  receivable_expiration_date?: string;
+
+  @IsString()
+  @IsOptional()
+  receivable_product?: string;
+
+  @IsString()
+  @IsOptional()
+  payable_title?: string;
+
+  @IsDateString()
+  @IsOptional()
+  payable_due_date?: string;
 }

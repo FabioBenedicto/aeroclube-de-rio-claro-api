@@ -89,4 +89,9 @@ export class UpsertSettingsDto {
   @IsOptional()
   @Type(() => Number)
   sicoob_juros_prazo?: number;
+
+  @IsString()
+  @IsOptional()
+  @Matches(/^[012]$/, { message: 'sicoob_juros_tipo deve ser 0, 1 ou 2' })
+  sicoob_juros_tipo?: string;
 }

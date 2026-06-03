@@ -32,7 +32,7 @@ import { notaFiscalStorage, notaFiscalFilter, buildNfPath, deleteNfFile } from '
 import { ExportThrottle } from '../common/decorators/export-throttle.decorator';
 import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
 
-const STATUS_LABEL: Record<number, string> = { 0: 'Em aberto', 1: 'Pago' };
+const STATUS_LABEL: Record<number, string> = { 0: 'Open', 1: 'Paid' };
 
 @ApiTags('receivables')
 @ApiBearerAuth()
@@ -44,7 +44,7 @@ export class ReceivablesController {
   @Get('export')
   @RequirePermission(PERM.RECEIVABLES.VIEW)
   @ExportThrottle()
-  @ApiOperation({ summary: 'Exportar títulos a receber em Excel' })
+  @ApiOperation({ summary: 'Export receivables to Excel' })
   async export(
     @Query('status') status: string,
     @Query('search') search: string,
@@ -55,7 +55,7 @@ export class ReceivablesController {
     const { total } = await this.receivablesService.findAll(status, search, dateFrom, dateTo, 1, 1);
     if (total > MAX_EXPORT_ROWS) {
       throw new BadRequestException(
-        `Existem ${total} registros. Use os filtros para reduzir para no máximo ${MAX_EXPORT_ROWS}.`,
+        `There are ${total} records. Use filters to reduce to at most ${MAX_EXPORT_ROWS}.`,
       );
     }
     const { data } = await this.receivablesService.findAll(status, search, dateFrom, dateTo, 1, total || 1);
@@ -71,28 +71,28 @@ export class ReceivablesController {
       status: STATUS_LABEL[r.status] ?? String(r.status),
     }));
 
-    const buffer = await buildExcel('Contas a receber', [
+    const buffer = await buildExcel('Receivables', [
       { header: 'ID', key: 'id', width: 10 },
-      { header: 'Título', key: 'title', width: 35 },
-      { header: 'Tipo', key: 'product', width: 16 },
-      { header: 'Cliente / Empresa', key: 'customer', width: 30 },
-      { header: 'Vencimento', key: 'expiration_date', width: 14 },
-      { header: 'Valor Total (R$)', key: 'total_amount', width: 18 },
-      { header: 'Recebido (R$)', key: 'amount_received', width: 16 },
-      { header: 'Saldo (R$)', key: 'remaining', width: 14 },
+      { header: 'Title', key: 'title', width: 35 },
+      { header: 'Type', key: 'product', width: 16 },
+      { header: 'Customer / Company', key: 'customer', width: 30 },
+      { header: 'Due Date', key: 'expiration_date', width: 14 },
+      { header: 'Total Amount (R$)', key: 'total_amount', width: 18 },
+      { header: 'Received (R$)', key: 'amount_received', width: 16 },
+      { header: 'Balance (R$)', key: 'remaining', width: 14 },
       { header: 'Status', key: 'status', width: 14 },
     ], rows);
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${reportFilename('contas-a-receber.xlsx')}"`,
+      'Content-Disposition': `attachment; filename="${reportFilename('receivables.xlsx')}"`,
     });
     res.send(buffer);
   }
 
   @Get()
   @RequirePermission(PERM.RECEIVABLES.VIEW)
-  @ApiOperation({ summary: 'Listar títulos a receber' })
+  @ApiOperation({ summary: 'List receivables' })
   findAll(
     @Query('status') status?: string,
     @Query('search') search?: string,
@@ -106,21 +106,21 @@ export class ReceivablesController {
 
   @Get(':id')
   @RequirePermission(PERM.RECEIVABLES.VIEW)
-  @ApiOperation({ summary: 'Detalhes do título' })
+  @ApiOperation({ summary: 'Get receivable details' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.receivablesService.findOne(id);
   }
 
   @Post()
   @RequirePermission(PERM.RECEIVABLES.CREATE)
-  @ApiOperation({ summary: 'Criar título a receber' })
+  @ApiOperation({ summary: 'Create receivable' })
   create(@Body() dto: CreateReceivableDto) {
     return this.receivablesService.create(dto);
   }
 
   @Patch(':id')
   @RequirePermission(PERM.RECEIVABLES.UPDATE)
-  @ApiOperation({ summary: 'Atualizar título a receber' })
+  @ApiOperation({ summary: 'Update receivable' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateReceivableDto,
@@ -131,14 +131,14 @@ export class ReceivablesController {
   @Delete(':id')
   @RequirePermission(PERM.RECEIVABLES.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Excluir título a receber' })
+  @ApiOperation({ summary: 'Delete receivable' })
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.receivablesService.delete(id);
   }
 
   @Post(':id/payments')
   @RequirePermission(PERM.RECEIVABLES.UPDATE)
-  @ApiOperation({ summary: 'Registrar pagamento de título a receber' })
+  @ApiOperation({ summary: 'Register receivable payment' })
   registerPayment(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreatePaymentDto,
@@ -149,7 +149,7 @@ export class ReceivablesController {
   @Delete(':id/payments/:paymentId')
   @RequirePermission(PERM.RECEIVABLES.UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Estornar pagamento de título a receber' })
+  @ApiOperation({ summary: 'Reverse receivable payment' })
   deletePayment(
     @Param('id', ParseIntPipe) _id: number,
     @Param('paymentId', ParseIntPipe) paymentId: number,
@@ -159,7 +159,7 @@ export class ReceivablesController {
 
   @Post(':id/payments/:paymentId/nota-fiscal')
   @RequirePermission(PERM.RECEIVABLES.UPDATE)
-  @ApiOperation({ summary: 'Anexar nota fiscal ao pagamento' })
+  @ApiOperation({ summary: 'Attach invoice (nota fiscal) to payment' })
   @UseInterceptors(FileInterceptor('file', {
     storage: notaFiscalStorage('receivable-payments'),
     fileFilter: notaFiscalFilter,
@@ -169,7 +169,7 @@ export class ReceivablesController {
     @Param('paymentId', ParseIntPipe) paymentId: number,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('Nenhum arquivo enviado');
+    if (!file) throw new BadRequestException('No file uploaded');
     const payment = await this.receivablesService.getPayment(paymentId);
     deleteNfFile(payment.nota_fiscal_path ?? null);
     const path = buildNfPath('receivable-payments', file.filename);
@@ -179,7 +179,7 @@ export class ReceivablesController {
   @Delete(':id/payments/:paymentId/nota-fiscal')
   @RequirePermission(PERM.RECEIVABLES.UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remover nota fiscal do pagamento' })
+  @ApiOperation({ summary: 'Remove invoice (nota fiscal) from payment' })
   async deletePaymentNotaFiscal(@Param('paymentId', ParseIntPipe) paymentId: number) {
     const payment = await this.receivablesService.getPayment(paymentId);
     deleteNfFile(payment.nota_fiscal_path ?? null);

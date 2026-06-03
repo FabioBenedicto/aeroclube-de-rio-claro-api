@@ -8,16 +8,16 @@ import { CreatePayablePaymentDto } from './dto/create-payable-payment.dto';
 export class PayablesService {
   constructor(private readonly repo: PayablesRepository) {}
 
-  async findAll(status?: string, clientId?: number, search?: string, dateFrom?: string, dateTo?: string, page = 1, limit = 20) {
+  async findAll(status?: string, clientId?: number, search?: string, dateFrom?: string, dateTo?: string, page = 1, limit = 20, instructorId?: number, employeeId?: number) {
     const from = dateFrom ? new Date(dateFrom) : undefined;
     const to = dateTo ? new Date(dateTo) : undefined;
-    const { data, total } = await this.repo.findAll(status, clientId, search, from, to, page, limit);
+    const { data, total } = await this.repo.findAll(status, clientId, search, from, to, page, limit, instructorId, employeeId);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: number) {
     const p = await this.repo.findById(id);
-    if (!p) throw new NotFoundException(`Título a pagar ${id} não encontrado`);
+    if (!p) throw new NotFoundException(`Payable ${id} not found`);
     return p;
   }
 
@@ -41,13 +41,13 @@ export class PayablesService {
 
   async deletePayment(paymentId: number) {
     const payment = await this.repo.deletePayment(paymentId);
-    if (!payment) throw new NotFoundException(`Pagamento ${paymentId} não encontrado`);
+    if (!payment) throw new NotFoundException(`Payment ${paymentId} not found`);
     return payment;
   }
 
   async getPayment(paymentId: number) {
     const p = await this.repo.findPaymentById(paymentId);
-    if (!p) throw new NotFoundException(`Pagamento ${paymentId} não encontrado`);
+    if (!p) throw new NotFoundException(`Payment ${paymentId} not found`);
     return p;
   }
 

@@ -12,13 +12,13 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Obter configurações' })
+  @ApiOperation({ summary: 'Get settings' })
   get() {
     return this.settingsService.get();
   }
 
   @Put()
-  @ApiOperation({ summary: 'Salvar configurações' })
+  @ApiOperation({ summary: 'Save settings' })
   upsert(@Body() dto: UpsertSettingsDto) {
     return this.settingsService.upsert(dto);
   }

@@ -8,7 +8,7 @@ export class SettingsService {
 
   async get() {
     const settings = await this.repo.find();
-    if (!settings) throw new NotFoundException('Configurações ainda não definidas');
+    if (!settings) throw new NotFoundException('Settings not configured yet');
     return settings;
   }
 

@@ -1,22 +1,24 @@
-import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNumber, IsOptional, IsEnum, Min, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
+import { AircraftType } from './create-plane.dto';
 
 export class UpdatePlaneDto {
-  @ApiPropertyOptional({ example: 'Cessna 172N' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(10)
+  registration?: string;
+
   @IsString()
   @IsOptional()
   model?: string;
 
-  @ApiPropertyOptional({ example: 890.0 })
+  @IsEnum(AircraftType)
+  @IsOptional()
+  aircraft_type?: AircraftType;
+
   @IsNumber()
   @Min(0.01)
   @IsOptional()
   @Type(() => Number)
   flight_hour_value?: number;
-
-  @ApiPropertyOptional({ example: 'maintenance', enum: ['active', 'maintenance', 'inactive'] })
-  @IsString()
-  @IsOptional()
-  status?: string;
 }
