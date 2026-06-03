@@ -1,34 +1,26 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { CreditsRepository } from './credits.repository';
 import { AddCreditDto } from './dto/add-credit.dto';
 
 @Injectable()
 export class CreditsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repo: CreditsRepository) {}
 
-  async getCustomerCredits(customerId: number) {
-    const customer = await this.prisma.person.findUnique({ where: { id: customerId } });
-    if (!customer) throw new NotFoundException(`Cliente ${customerId} não encontrado`);
-    const movements = await this.prisma.receivablePayment.findMany({
-      where: { receivable: { client_id: customerId } },
-      orderBy: { payment_date: 'desc' },
-      take: 20,
-      include: { receivable: { select: { title: true } } },
-    });
+  async getPersonCredits(personId: number) {
+    const person = await this.repo.findPerson(personId);
+    if (!person) throw new NotFoundException(`Person ${personId} not found`);
+    const movements = await this.repo.getMovements(personId);
     return {
-      customer_id: customerId,
-      flight_hour_balance: customer.flight_hour_balance,
+      person_id:           personId,
+      flight_hour_balance: person.flight_hour_balance,
       movements,
     };
   }
 
-  async addCredit(customerId: number, dto: AddCreditDto) {
-    const customer = await this.prisma.person.findUnique({ where: { id: customerId } });
-    if (!customer) throw new NotFoundException(`Cliente ${customerId} não encontrado`);
-    const updated = await this.prisma.person.update({
-      where: { id: customerId },
-      data: { flight_hour_balance: { increment: dto.amount } },
-    });
-    return { customer_id: customerId, flight_hour_balance: updated.flight_hour_balance, added: dto.amount };
+  async addCredit(personId: number, dto: AddCreditDto) {
+    const person = await this.repo.findPerson(personId);
+    if (!person) throw new NotFoundException(`Person ${personId} not found`);
+    const updated = await this.repo.addCredit(personId, dto.amount);
+    return { person_id: personId, flight_hour_balance: updated.flight_hour_balance, added: dto.amount };
   }
 }

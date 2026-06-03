@@ -1,11 +1,5 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  UseGuards,
-  ParseIntPipe,
+  Controller, Get, Post, Param, Body, UseGuards, ParseIntPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -15,22 +9,22 @@ import { AddCreditDto } from './dto/add-credit.dto';
 @ApiTags('credits')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('customers/:customerId/credits')
+@Controller('peoples/:personId/credits')
 export class CreditsController {
   constructor(private readonly creditsService: CreditsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Saldo e movimentações de crédito do cliente' })
-  getCredits(@Param('customerId', ParseIntPipe) customerId: number) {
-    return this.creditsService.getCustomerCredits(customerId);
+  @ApiOperation({ summary: 'Credit balance and movements for a person' })
+  getCredits(@Param('personId', ParseIntPipe) personId: number) {
+    return this.creditsService.getPersonCredits(personId);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Adicionar crédito ao cliente' })
+  @ApiOperation({ summary: 'Add credit to a person' })
   addCredit(
-    @Param('customerId', ParseIntPipe) customerId: number,
+    @Param('personId', ParseIntPipe) personId: number,
     @Body() dto: AddCreditDto,
   ) {
-    return this.creditsService.addCredit(customerId, dto);
+    return this.creditsService.addCredit(personId, dto);
   }
 }
