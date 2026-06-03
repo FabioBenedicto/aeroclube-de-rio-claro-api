@@ -1,12 +1,16 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Param,
+  Query,
   UseGuards,
   Res,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -28,15 +32,44 @@ export class CnabController {
   @Post('remessa')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Gerar arquivo CNAB 240 de remessa para o Sicoob' })
-  async generateRemessa(@Body() dto: GenerateRemessaDto, @Res() res: Response) {
-    const buffer = await this.cnabService.generateRemessa(dto);
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  generateRemessa(@Body() dto: GenerateRemessaDto) {
+    return this.cnabService.generateRemessa(dto);
+  }
+
+  @Get('remessas')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Listar remessas CNAB geradas' })
+  listRemessas(
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.cnabService.listRemessas(Number(page), Number(limit));
+  }
+
+  @Get('remessas/:id/download')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Baixar arquivo .rem de uma remessa' })
+  async downloadRemessa(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.cnabService.downloadRemessa(id);
     res.set({
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="remessa_${date}.rem"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': buffer.length,
     });
     res.send(buffer);
+  }
+
+  @Get('retornos')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Listar retornos CNAB processados' })
+  listRetornos(
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.cnabService.listRetornos(Number(page), Number(limit));
   }
 
   @Post('retorno')
