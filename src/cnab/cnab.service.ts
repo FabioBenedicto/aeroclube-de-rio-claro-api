@@ -79,7 +79,7 @@ export class CnabService {
       bill_ids: dto.bill_ids,
       bill_count: dto.bill_ids.length,
       total_amount: totalAmount,
-      file_path: `/uploads/cnab/${filename}`,
+      file_path: `uploads/cnab/${filename}`,
     });
   }
 
