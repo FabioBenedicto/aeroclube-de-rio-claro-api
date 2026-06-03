@@ -84,9 +84,8 @@ describe('FlightsService', () => {
     expect(input.buildReceivable).toBeDefined();
     expect(input.buildPayable).toBeDefined();
 
-    const { payableData, installmentData } = input.buildPayable(42);
-    expect(payableData.title).toBe('Instruction 42');
-    expect(installmentData.installment_number).toBe(1);
+    const payable = input.buildPayable(42);
+    expect(payable.title).toBe('Instruction 42');
   });
 
   it('throws NotFoundException for unknown plane', async () => {
