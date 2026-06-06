@@ -89,7 +89,7 @@ describe('UsersService', () => {
 
   describe('remove', () => {
     it('removes user successfully', async () => {
-      mockRepo.findById.mockResolvedValue(userRow);
+      mockRepo.findById.mockResolvedValue({ ...userRow, role: Role.EMPLOYEE });
       mockRepo.removeUser.mockResolvedValue(userRow);
       await service.remove(1, 2);
       expect(mockRepo.removeUser).toHaveBeenCalledWith(1);
