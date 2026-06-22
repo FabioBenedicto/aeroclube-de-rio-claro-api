@@ -1,12 +1,28 @@
-import { IsString, IsOptional, IsDateString, IsInt, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PayerType } from '../../receivables/enums/payer-type.enum';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+
+import { Stakeholder } from '../../shared/enums/stakeholder.enum';
 
 export class UpdatePayableDto {
+  @IsEnum(Stakeholder)
+  @IsOptional()
+  stakeholder?: Stakeholder;
+
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  client_id?: number;
+  person_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  student_id?: number;
 
   @IsInt()
   @IsOptional()
@@ -33,10 +49,6 @@ export class UpdatePayableDto {
   @Type(() => Number)
   employee_id?: number;
 
-  @IsEnum(PayerType)
-  @IsOptional()
-  payer_type?: PayerType;
-
   @IsString()
   @IsOptional()
   title?: string;
@@ -45,11 +57,11 @@ export class UpdatePayableDto {
   @IsOptional()
   description?: string;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  product?: string;
+  payable_type_id?: number;
 
   @IsDateString()
   @IsOptional()
-  due_date?: string;
+  expiration_date?: string;
 }

@@ -1,52 +1,50 @@
+import { Type } from 'class-transformer';
 import {
-  IsString,
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
-  IsNotEmpty,
-  IsInt,
-  IsEnum,
-  IsDateString,
+  IsString,
   Min,
   ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { Recurrence } from '../enums/recurrence.enum';
-import { PayerType } from '../../receivables/enums/payer-type.enum';
+
+import { Recurrence } from '../../shared/enums/recurrence.enum';
+import { Stakeholder } from '../../shared/enums/stakeholder.enum';
 
 export class CreatePayableDto {
-  @IsInt()
-  @IsOptional()
-  @Type(() => Number)
-  client_id?: number;
+  @IsEnum(Stakeholder)
+  stakeholder: Stakeholder;
 
   @IsInt()
   @IsOptional()
-  @Type(() => Number)
+  person_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  student_id?: number;
+
+  @IsInt()
+  @IsOptional()
   company_id?: number;
 
   @IsInt()
   @IsOptional()
-  @Type(() => Number)
-  plane_id?: number;
-
-  @IsInt()
-  @IsOptional()
-  @Type(() => Number)
   instructor_id?: number;
 
   @IsInt()
   @IsOptional()
-  @Type(() => Number)
   partner_id?: number;
 
   @IsInt()
   @IsOptional()
-  @Type(() => Number)
   employee_id?: number;
 
-  @IsEnum(PayerType)
+  @IsInt()
   @IsOptional()
-  payer_type?: PayerType;
+  plane_id?: number;
 
   @IsString()
   @IsNotEmpty()
@@ -58,16 +56,15 @@ export class CreatePayableDto {
 
   @IsNumber()
   @Min(0.01)
-  @Type(() => Number)
-  amount: number;
+  total_amount: number;
 
-  @IsDateString()
-  @IsOptional()
-  due_date?: string;
+  @IsDate()
+  @Type(() => Date)
+  expiration_date: Date;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  product?: string;
+  payable_type_id?: number;
 
   @IsEnum(Recurrence)
   @IsOptional()
@@ -76,6 +73,5 @@ export class CreatePayableDto {
   @IsInt()
   @Min(2)
   @ValidateIf((o) => o.recurrence !== undefined)
-  @Type(() => Number)
-  occurrences?: number;
+  occurrences: number;
 }
