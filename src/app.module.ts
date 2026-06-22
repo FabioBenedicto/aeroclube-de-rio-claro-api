@@ -14,6 +14,7 @@ import { PayablesModule } from './payables/payables.module';
 import { PeoplesModule } from './peoples/peoples.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReceivablesModule } from './receivables/receivables.module';
+import { PayableTypesModule } from './payable-types/payable-types.module';
 import { ReceivableTypesModule } from './receivable-types/receivable-types.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
@@ -37,6 +38,7 @@ import { UsersModule } from './users/users.module';
     ReportsModule,
     CnabModule,
     ReceivableTypesModule,
+    PayableTypesModule,
   ],
 })
 export class AppModule {}
