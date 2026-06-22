@@ -34,7 +34,10 @@ export class ReceivableTypesService {
 
   async update(id: number, dto: UpdateReceivableTypeDto) {
     await this.findById(id);
-    return this.repo.update(id, dto.name!);
+    if (dto.name === undefined) {
+      return this.findById(id);
+    }
+    return this.repo.update(id, dto.name);
   }
 
   async delete(id: number) {
