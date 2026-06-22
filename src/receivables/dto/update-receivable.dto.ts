@@ -1,17 +1,32 @@
+import { Type } from 'class-transformer';
 import {
-  IsString,
+  IsDate,
+  IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
-  IsInt,
-  IsEnum,
-  IsDateString,
+  IsString,
   Min,
   ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { PayerType } from '../enums/payer-type.enum';
+
+import { Stakeholder } from '../../shared/enums/stakeholder.enum';
 
 export class UpdateReceivableDto {
+  @IsEnum(Stakeholder)
+  @IsOptional()
+  stakeholder?: Stakeholder;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  person_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  student_id?: number;
+
   @IsInt()
   @IsOptional()
   @Type(() => Number)
@@ -28,7 +43,7 @@ export class UpdateReceivableDto {
   plane_id?: number;
 
   @IsOptional()
-  @ValidateIf(o => o.flight_id !== null)
+  @ValidateIf((o) => o.flight_id !== null)
   @IsInt()
   @Min(1)
   @Type(() => Number)
@@ -49,10 +64,6 @@ export class UpdateReceivableDto {
   @Type(() => Number)
   employee_id?: number;
 
-  @IsEnum(PayerType)
-  @IsOptional()
-  payer_type?: PayerType;
-
   @IsString()
   @IsOptional()
   title?: string;
@@ -67,11 +78,12 @@ export class UpdateReceivableDto {
   @Type(() => Number)
   total_amount?: number;
 
-  @IsDateString()
+  @IsDate()
+  @Type(() => Date)
   @IsOptional()
-  expiration_date?: string;
+  expiration_date?: Date;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  product?: string;
+  receivable_type_id?: number;
 }
