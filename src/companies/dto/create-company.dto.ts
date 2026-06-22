@@ -1,13 +1,15 @@
-import { IsString, IsOptional, IsNotEmpty, IsEmail } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+
+import { IsCnpj } from '@common/validators';
 
 export class CreateCompanyDto {
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @IsString()
-  @IsOptional()
-  cnpj?: string;
+  @IsCnpj()
+  @IsNotEmpty()
+  cnpj: string;
 
   @IsEmail()
   @IsOptional()

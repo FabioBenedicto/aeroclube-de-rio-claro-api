@@ -1,11 +1,13 @@
-import { IsString, IsOptional, IsEmail } from 'class-validator';
+import { IsEmail, IsOptional, IsString } from 'class-validator';
+
+import { IsCnpj } from '@common/validators';
 
 export class UpdateCompanyDto {
   @IsString()
   @IsOptional()
   name?: string;
 
-  @IsString()
+  @IsCnpj()
   @IsOptional()
   cnpj?: string;
 
