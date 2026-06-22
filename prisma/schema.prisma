@@ -11,29 +11,75 @@ enum Role {
   EMPLOYEE
 }
 
+enum BillStatus {
+  open
+  pending_cnab
+  paid
+  cancelled
+}
+
+enum TitleStatus {
+  OPEN
+  PARTIAL
+  PAID
+}
+
+enum TitleStakeholder {
+  PEOPLE
+  STUDENT
+  PARTNER
+  INSTRUCTOR
+  EMPLOYEE
+  COMPANY
+  NONE
+}
+
+model ReceivableType {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique @db.VarChar(50)
+  created_at  DateTime     @default(now())
+  receivables Receivable[]
+
+  @@map("receivable_types")
+}
+
+model PayableType {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique @db.VarChar(50)
+  created_at DateTime  @default(now())
+  payables   Payable[]
+
+  @@map("payable_types")
+}
+
 model Settings {
   id                     Int     @id @default(1)
-  instructor_percentage  Decimal @db.Decimal(5, 2)
-  partner_monthly_dues   Decimal @db.Decimal(10, 2)
+  instructor_percentage  Decimal @default(0) @db.Decimal(5, 2)
+  partner_monthly_dues   Decimal @default(0) @db.Decimal(10, 2)
   glider_initial_minutes Int     @default(45)
   glider_initial_value   Decimal @default(330) @db.Decimal(10, 2)
   glider_minute_value    Decimal @default(3) @db.Decimal(10, 2)
 
-  sicoob_cooperativa_prefix String? @db.VarChar(5)
-  sicoob_cooperativa_dv     String? @db.VarChar(1)
-  sicoob_agencia            String? @db.VarChar(4)
-  sicoob_conta              String? @db.VarChar(12)
-  sicoob_conta_dv           String? @db.VarChar(1)
-  sicoob_carteira           String? @db.VarChar(1)
-  sicoob_modalidade         String? @db.VarChar(2)
-  sicoob_cnpj               String? @db.VarChar(14)
-  sicoob_nome_empresa       String? @db.VarChar(30)
-  sicoob_remessa_sequence   Int     @default(0)
-  sicoob_juros              Decimal @default(0) @db.Decimal(5, 2)
-  sicoob_juros_prazo        Int     @default(0)
-  sicoob_juros_tipo         String  @default("2") @db.VarChar(1)
-
   @@map("settings")
+}
+
+model SicoobSettings {
+  id                  Int     @id @default(1)
+  cooperative_prefix  String? @db.VarChar(5)
+  cooperative_digit   String? @db.VarChar(1)
+  branch              String? @db.VarChar(4)
+  account             String? @db.VarChar(12)
+  account_digit       String? @db.VarChar(1)
+  wallet              String? @db.VarChar(1)
+  modality            String? @db.VarChar(2)
+  cnpj                String? @db.VarChar(14)
+  company_name        String? @db.VarChar(30)
+  remittance_sequence Int     @default(0)
+  interest_rate       Decimal @default(0) @db.Decimal(5, 2)
+  interest_period     Int     @default(0)
+  interest_type       String  @default("2") @db.VarChar(1)
+
+  @@map("sicoob_config")
 }
 
 model User {
@@ -50,7 +96,18 @@ model User {
   @@map("users")
 }
 
-model Person {
+model UserPermission {
+  id         Int    @id @default(autoincrement())
+  user_id    Int
+  permission String @db.VarChar(50)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, permission])
+  @@map("user_permissions")
+}
+
+model People {
   id                  Int      @id @default(autoincrement())
   cpf                 String   @unique @db.VarChar(14)
   name                String   @db.VarChar(100)
@@ -58,30 +115,75 @@ model Person {
   phone_number        String?  @db.VarChar(20)
   flight_hour_balance Int      @default(0)
   credit_balance      Decimal  @default(0) @db.Decimal(10, 2)
-  address             String?  @db.VarChar(40)
-  neighborhood        String?  @db.VarChar(50)
-  city                String?  @db.VarChar(50)
-  state               String?  @db.VarChar(2)
-  zip_code            String?  @db.VarChar(8)
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
-  instructors Instructor[]
-  partners    Partner[]
-  students    Student[]
-  employees   Employee[]
+  address     Address?
+  students    Student?
+  partners    Partner?
+  instructors Instructor?
+  employees   Employee?
+
   flights     Flight[]
   bills       Bill[]
   receivables Receivable[]
   payables    Payable[]
+  studentId   Int
 
   @@map("peoples")
 }
 
+model Address {
+  id           Int     @id @default(autoincrement())
+  street       String? @db.VarChar(40)
+  neighborhood String? @db.VarChar(50)
+  city         String? @db.VarChar(50)
+  state        String? @db.VarChar(2)
+  zip_code     String? @db.VarChar(8)
+
+  people_id Int    @unique
+  people    People @relation(fields: [people_id], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model Student {
+  id         Int      @id @default(autoincrement())
+  created_at DateTime @default(now())
+
+  people_id Int    @unique
+  people    People @relation(fields: [people_id], references: [id])
+
+  receivables Receivable[]
+  payables    Payable[]
+
+  @@map("student")
+}
+
+model Partner {
+  id                Int       @id @default(autoincrement())
+  monthly_dues      Decimal   @db.Decimal(10, 2)
+  next_due_date     DateTime? @db.Date
+  last_payment_date DateTime? @db.Date
+  status            String    @default("active") @db.VarChar(20)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  people_id Int    @unique
+  people    People @relation(fields: [people_id], references: [id])
+
+  receivables Receivable[]
+  payables    Payable[]
+
+  @@map("partners")
+}
+
 model Instructor {
-  id          Int      @id @default(autoincrement())
-  customer_id Int
-  customer    Person   @relation(fields: [customer_id], references: [id])
+  id         Int      @id @default(autoincrement())
+  created_at DateTime @default(now())
+
+  people_id Int    @unique
+  people    People @relation(fields: [people_id], references: [id])
 
   flights     Flight[]
   payables    Payable[]
@@ -90,107 +192,17 @@ model Instructor {
   @@map("instructors")
 }
 
-model Partner {
-  id                Int       @id @default(autoincrement())
-  customer_id       Int
-  monthly_dues      Decimal   @db.Decimal(10, 2)
-  next_due_date     DateTime? @db.Date
-  last_payment_date DateTime? @db.Date
-  status            String    @default("active") @db.VarChar(20)
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
-
-  customer     Person       @relation(fields: [customer_id], references: [id])
-  receivables  Receivable[]
-  payables     Payable[]
-
-  @@map("partners")
-}
-
-model Student {
-  id          Int      @id @default(autoincrement())
-  customer_id Int
-
-  customer Person   @relation(fields: [customer_id], references: [id])
-
-  @@map("student")
-}
-
 model Employee {
-  id          Int      @id @default(autoincrement())
-  customer_id Int
+  id         Int      @id @default(autoincrement())
+  created_at DateTime @default(now())
 
-  customer     Person       @relation(fields: [customer_id], references: [id])
-  receivables  Receivable[]
-  payables     Payable[]
+  people_id Int    @unique
+  people    People @relation(fields: [people_id], references: [id])
 
-  @@map("employees")
-}
-
-model Plane {
-  id                Int      @id @default(autoincrement())
-  registration      String   @unique @db.VarChar(10)
-  model             String?  @db.VarChar(60)
-  aircraft_type     String   @default("airplane") @db.VarChar(10)
-  flight_hour_value Decimal? @db.Decimal(10, 2)
-  created_at        DateTime @default(now())
-
-  flights     Flight[]
   receivables Receivable[]
   payables    Payable[]
 
-  @@map("planes")
-}
-
-model Flight {
-  id                    Int       @id @default(autoincrement())
-  plane_id              Int
-  customer_id           Int
-  instructor_id         Int?
-  aircraft_type         String    @default("airplane") @db.VarChar(10)
-  type                  String    @db.VarChar(30)
-  double_command        Boolean   @default(false)
-  origin                String    @db.VarChar(10)
-  destination           String    @db.VarChar(10)
-  start_date            DateTime
-  end_date              DateTime?
-  total_hours           Decimal?  @db.Decimal(6, 2)
-  total_amount          Decimal?  @db.Decimal(10, 2)
-  calculation_breakdown Json?
-
-  plane      Plane       @relation(fields: [plane_id], references: [id])
-  customer   Person      @relation(fields: [customer_id], references: [id])
-  instructor Instructor? @relation(fields: [instructor_id], references: [id])
-
-  receivables Receivable[]
-
-  @@map("flights")
-}
-
-enum BillStatus {
-  open
-  pending_cnab
-  paid
-  cancelled
-}
-
-model Bill {
-  id               Int        @id @default(autoincrement())
-  customer_id      Int
-  total_amount     Decimal    @default(0) @db.Decimal(10, 2)
-  issue_date       DateTime   @default(now()) @db.Date
-  due_date         DateTime?  @db.Date
-  paid_at          DateTime?
-  status           BillStatus @default(open)
-  payment_source   String?    @db.VarChar(10)
-  payment_method   String?    @db.VarChar(30)
-  created_at       DateTime   @default(now())
-  nota_fiscal_path String?
-
-  customer            Person              @relation(fields: [customer_id], references: [id])
-  receivable_payments ReceivablePayment[]
-
-  @@map("bills")
+  @@map("employees")
 }
 
 model Company {
@@ -208,137 +220,214 @@ model Company {
   @@map("companies")
 }
 
-enum PayerType {
-  customer
-  company
-  instructor
-  partner
-  employee
-  none
+model Aircraft {
+  id                Int      @id @default(autoincrement())
+  registration      String   @unique @db.VarChar(10)
+  model             String   @db.VarChar()
+  type              String   @default("airplane") @db.VarChar(10)
+  flight_hour_value Decimal? @db.Decimal(10, 2)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt()
+
+  flights     Flight[]
+  receivables Receivable[]
+  payables    Payable[]
+
+  @@map("aircrafts")
+}
+
+model Flight {
+  id                    Int       @id @default(autoincrement())
+  type                  String    @db.VarChar(30)
+  origin                String    @db.VarChar(10)
+  destination           String    @db.VarChar(10)
+  start_date            DateTime
+  end_date              DateTime?
+  total_hours           Decimal?  @db.Decimal(6, 2)
+  total_amount          Decimal?  @db.Decimal(10, 2)
+  calculation_breakdown Json?
+
+  aircraft_id Int
+  aircraft    Aircraft @relation(fields: [aircraft_id], references: [id])
+
+  people_id Int
+  people    People @relation(fields: [people_id], references: [id])
+
+  instructor_id Int?
+  instructor    Instructor? @relation(fields: [instructor_id], references: [id])
+
+  receivables Receivable[]
+  payables    Payable[]
+
+  @@map("flights")
 }
 
 model Receivable {
-  id              Int       @id @default(autoincrement())
-  client_id       Int?
-  company_id      Int?
-  flight_id       Int?
-  instructor_id   Int?
-  plane_id        Int?
-  partner_id      Int?
-  employee_id     Int?
-  payer_type      PayerType @default(none)
-  title           String    @db.VarChar(100)
+  id              Int              @id @default(autoincrement())
+  stakeholder     TitleStakeholder @default(NONE)
+  title           String
   description     String?
-  expiration_date DateTime? @db.Date
-  total_amount    Decimal   @db.Decimal(10, 2)
-  amount_received Decimal   @default(0) @db.Decimal(10, 2)
-  product         String?   @db.VarChar(50)
-  status          Int       @default(0) @db.SmallInt
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  expiration_date DateTime         @db.Date
+  total_amount    Decimal          @db.Decimal(10, 2)
+  amount_received Decimal          @default(0) @db.Decimal(10, 2)
+  receivable_type_id Int
+  receivable_type    ReceivableType @relation(fields: [receivable_type_id], references: [id])
+  status          TitleStatus      @default(OPEN)
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
 
-  customer   Person?     @relation(fields: [client_id], references: [id])
-  company    Company?    @relation(fields: [company_id], references: [id])
-  flight     Flight?     @relation(fields: [flight_id], references: [id], onDelete: Cascade)
-  instructor Instructor? @relation(fields: [instructor_id], references: [id])
-  plane      Plane?      @relation(fields: [plane_id], references: [id])
-  partner    Partner?    @relation(fields: [partner_id], references: [id])
-  employee   Employee?   @relation(fields: [employee_id], references: [id])
-  payments   ReceivablePayment[]
+  people_id Int?
+  people    People? @relation(fields: [people_id], references: [id])
+
+  student_id Int?
+  student    Student? @relation(fields: [student_id], references: [id])
+
+  partner_id Int?
+  partner    Partner? @relation(fields: [partner_id], references: [id])
+
+  instructor_id Int?
+  instructor    Instructor? @relation(fields: [instructor_id], references: [id])
+
+  employee_id Int?
+  employee    Employee? @relation(fields: [employee_id], references: [id])
+
+  company_id Int?
+  company    Company? @relation(fields: [company_id], references: [id])
+
+  aircraft_id Int?
+  aircraft    Aircraft? @relation(fields: [aircraft_id], references: [id])
+
+  flight_id Int?
+  flight    Flight? @relation(fields: [flight_id], references: [id], onDelete: Cascade)
+
+  payments ReceivablePayment[]
 
   @@map("receivables")
 }
 
 model ReceivablePayment {
-  id               Int      @id @default(autoincrement())
-  receivable_id    Int
-  bill_id          Int?
-  amount_received  Decimal  @db.Decimal(10, 2)
-  payment_method   String?  @db.VarChar(30)
-  payment_date     DateTime @default(now())
-  nota_fiscal_path String?
+  id           Int      @id @default(autoincrement())
+  amount       Decimal  @db.Decimal(10, 2)
+  method       String?  @db.VarChar(30)
+  payment_date DateTime @default(now())
 
-  receivable Receivable @relation(fields: [receivable_id], references: [id], onDelete: Cascade)
-  bill       Bill?      @relation(fields: [bill_id], references: [id])
+  receivable_id Int
+  receivable    Receivable @relation(fields: [receivable_id], references: [id], onDelete: Cascade)
+
+  file_id Int?  @unique
+  file    File? @relation(fields: [file_id], references: [id])
+
+  bill_id Int?
+  bill    Bill? @relation(fields: [bill_id], references: [id])
 
   @@map("receivable_payments")
 }
 
 model Payable {
-  id            Int       @id @default(autoincrement())
-  client_id     Int?
-  company_id    Int?
-  instructor_id Int?
-  plane_id      Int?
-  partner_id    Int?
-  employee_id   Int?
-  payer_type    PayerType @default(none)
-  title         String    @db.VarChar(100)
-  description   String?
-  amount        Decimal   @db.Decimal(10, 2)
-  amount_paid   Decimal   @default(0) @db.Decimal(10, 2)
-  status        String    @default("open") @db.VarChar(20)
-  due_date      DateTime? @db.Date
-  product       String?   @db.VarChar(50)
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  id              Int              @id @default(autoincrement())
+  stakeholder     TitleStakeholder @default(NONE)
+  title           String           @db.VarChar(100)
+  description     String?
+  total_amount    Decimal          @db.Decimal(10, 2)
+  amount_paid     Decimal          @default(0) @db.Decimal(10, 2)
+  status          TitleStatus      @default(OPEN)
+  expiration_date DateTime?        @db.Date
+  payable_type_id Int?
+  payable_type    PayableType?     @relation(fields: [payable_type_id], references: [id])
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
 
-  customer   Person?        @relation(fields: [client_id], references: [id])
-  company    Company?       @relation(fields: [company_id], references: [id])
-  instructor Instructor?    @relation(fields: [instructor_id], references: [id])
-  plane      Plane?         @relation(fields: [plane_id], references: [id])
-  partner    Partner?       @relation(fields: [partner_id], references: [id])
-  employee   Employee?      @relation(fields: [employee_id], references: [id])
-  payments   PayablePayment[]
+  people_id Int?
+  people    People? @relation(fields: [people_id], references: [id])
+
+  student_id Int?
+  student    Student? @relation(fields: [student_id], references: [id])
+
+  partner_id Int?
+  partner    Partner? @relation(fields: [partner_id], references: [id])
+
+  instructor_id Int?
+  instructor    Instructor? @relation(fields: [instructor_id], references: [id])
+
+  employee_id Int?
+  employee    Employee? @relation(fields: [employee_id], references: [id])
+
+  company_id Int?
+  company    Company? @relation(fields: [company_id], references: [id])
+
+  aircraft_id Int?
+  aircraft    Aircraft? @relation(fields: [aircraft_id], references: [id])
+
+  flight_id Int?
+  flight    Flight? @relation(fields: [flight_id], references: [id], onDelete: Cascade)
+
+  payments PayablePayment[]
 
   @@map("payables")
 }
 
 model PayablePayment {
-  id               Int      @id @default(autoincrement())
-  payable_id       Int
-  amount           Decimal  @db.Decimal(10, 2)
-  method           String?  @db.VarChar(30)
-  paid_at          DateTime @default(now())
-  notes            String?
-  nota_fiscal_path String?
+  id           Int      @id @default(autoincrement())
+  payable_id   Int
+  amount       Decimal  @db.Decimal(10, 2)
+  method       String?  @db.VarChar(30)
+  payment_date DateTime @default(now())
+
+  file_id Int?  @unique
+  file    File? @relation(fields: [file_id], references: [id])
 
   payable Payable @relation(fields: [payable_id], references: [id], onDelete: Cascade)
 
   @@map("payable_payments")
 }
 
-model UserPermission {
-  id         Int    @id @default(autoincrement())
-  user_id    Int
-  permission String @db.VarChar(50)
+model Bill {
+  id              Int        @id @default(autoincrement())
+  total_amount    Decimal    @default(0) @db.Decimal(10, 2)
+  expiration_date DateTime   @db.Date
+  status          BillStatus @default(open)
+  payment_date    DateTime?
+  payment_method  String?    @db.VarChar(30)
+  created_at      DateTime   @default(now())
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  people_id Int
+  People    People @relation(fields: [people_id], references: [id])
 
-  @@unique([user_id, permission])
-  @@map("user_permissions")
+  file_id Int?  @unique
+  file    File? @relation(fields: [file_id], references: [id])
+
+  receivable_payments ReceivablePayment[]
+
+  @@map("bills")
 }
 
 model CnabRemessa {
   id              Int      @id @default(autoincrement())
-  created_at      DateTime @default(now())
   sequence_number Int
   bill_ids        Json
   bill_count      Int
   total_amount    Decimal  @db.Decimal(12, 2)
-  file_path       String   @db.VarChar(200)
+  created_at      DateTime @default(now())
+
+  file_id Int  @unique
+  file    File @relation(fields: [file_id], references: [id])
 
   @@map("cnab_remessas")
 }
 
-model CnabRetorno {
-  id             Int      @id @default(autoincrement())
-  processed_at   DateTime @default(now())
-  paid_ids       Json
-  rejected_ids   Json
-  errors         Json
-  paid_count     Int
-  rejected_count Int
+model File {
+  id            Int      @id @default(autoincrement())
+  url           String
+  blob_path     String   @db.VarChar(300)
+  original_name String   @db.VarChar(255)
+  mime_type     String   @db.VarChar(100)
+  size          Int
+  created_at    DateTime @default(now())
 
-  @@map("cnab_retornos")
+  bill               Bill?
+  receivable_payment ReceivablePayment?
+  payable_payment    PayablePayment?
+  cnab_remessa       CnabRemessa?
+
+  @@map("files")
 }
