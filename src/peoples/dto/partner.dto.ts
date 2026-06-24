@@ -1,5 +1,5 @@
-import { IsNumber, IsOptional, IsDateString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsDateString, IsNumber, IsOptional, Min } from 'class-validator';
 
 export class PartnerDto {
   @IsNumber()

@@ -1,8 +1,10 @@
-import { paginate } from '../../common/dto/pagination.dto';
+import { Paginated } from '../../common/dto/pagination.dto';
 import { FindAllFlightsDto } from '../dto/find-all-flights.dto';
 import { Flight } from '../model/flight.model';
 
-export type PaginatedFlights = ReturnType<typeof paginate<Flight>>;
+export const FLIGHTS_REPOSITORY = Symbol('IFlightsRepository');
+
+export type PaginatedFlights = Paginated<Flight>;
 
 export interface PlaneSummary {
   id: number;
@@ -19,9 +21,8 @@ export interface FlightSettings {
 
 export interface ReceivableInput {
   peopleId: number;
-  aircraftId: number;
-  instructorId?: number;
   title: string;
+  description?: string;
   expirationDate: Date;
   totalAmount: number;
   receivable_type_id: number;
@@ -31,6 +32,7 @@ export interface ReceivableInput {
 export interface PayableInput {
   instructorId: number;
   title: string;
+  description?: string;
   amount: number;
   payable_type_id: number;
   dueDate: Date;
@@ -74,7 +76,12 @@ export interface UpdateFlightData {
   peopleId?: number;
   instructorId?: number | null;
   newInstructorPayableAmount?: number;
-  instructionPayableTypeId?: number;
+}
+
+export interface FlightStats {
+  total: number;
+  total_hours: number | null;
+  total_revenue: number | null;
 }
 
 export interface IFlightsRepository {
@@ -82,9 +89,11 @@ export interface IFlightsRepository {
   findAircraft(id: number): Promise<PlaneSummary | null>;
   findSettings(): Promise<FlightSettings | null>;
   findAll(dto: FindAllFlightsDto): Promise<PaginatedFlights>;
+  getStats(dto: FindAllFlightsDto): Promise<FlightStats>;
   findById(id: number): Promise<Flight | null>;
   updateFlightAndRelations(id: number, data: UpdateFlightData): Promise<Flight>;
   closeFlight(id: number, data: CloseFlightData): Promise<Flight>;
   hasReceivableWithPayments(flightId: number): Promise<boolean>;
   delete(id: number): Promise<Flight>;
+  bulkDelete(ids: number[]): Promise<void>;
 }

@@ -1,153 +1,130 @@
+import { AZURE_BLOB_SERVICE } from '@common/providers/azure-blob/azure-blob.service.interface';
 import {
+  Body,
   Controller,
-  Get,
-  Post,
-  Patch,
   Delete,
+  FileTypeValidator,
+  Get,
   HttpCode,
   HttpStatus,
+  Inject,
+  MaxFileSizeValidator,
   Param,
-  Body,
-  Query,
-  UseGuards,
+  ParseFilePipe,
   ParseIntPipe,
-  Res,
-  UseInterceptors,
+  Patch,
+  Post,
+  Query,
   UploadedFile,
-  BadRequestException,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+
+import { PERMISSIONS } from '../common/constants/permissions';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { PERM } from '../common/constants/permissions';
-import { PayablesService } from './payables.service';
+import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
+import { AzureBlobService } from '../common/providers/azure-blob/azure-blob.service';
+import { PaginatedResponse } from '../common/swagger/paginated-response';
 import { CreatePayableDto } from './dto/create-payable.dto';
-import { UpdatePayableDto } from './dto/update-payable.dto';
 import { CreatePayablePaymentDto } from './dto/create-payable-payment.dto';
-import { buildExcel, reportFilename } from '../common/utils/excel.util';
-import { notaFiscalStorage, notaFiscalFilter, buildNfPath, deleteNfFile } from '../common/utils/upload.config';
-import { ExportThrottle } from '../common/decorators/export-throttle.decorator';
-import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
-
-const P_STATUS_LABEL: Record<string, string> = { open: 'Payable', partial: 'Partial', closed: 'Paid' };
+import { FindAllPayablesDto } from './dto/find-all-payables.dto';
+import { UpdatePayableDto } from './dto/update-payable.dto';
+import { Payable } from './model/payable.model';
+import { PayablesService } from './payables.service';
 
 @ApiTags('payables')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('payables')
 export class PayablesController {
-  constructor(private readonly payablesService: PayablesService) {}
+  constructor(
+    private readonly payablesService: PayablesService,
 
-  @Get('export')
-  @RequirePermission(PERM.PAYABLES.VIEW)
-  @ExportThrottle()
-  @ApiOperation({ summary: 'Export payables to Excel' })
-  async export(
-    @Query('status') status: string,
-    @Query('search') search: string,
-    @Query('date_from') dateFrom: string,
-    @Query('date_to') dateTo: string,
-    @Res() res: Response,
-  ) {
-    const { total } = await this.payablesService.findAll(status, undefined, search, dateFrom, dateTo, 1, 1);
-    if (total > MAX_EXPORT_ROWS) {
-      throw new BadRequestException(
-        `There are ${total} records. Use filters to reduce to at most ${MAX_EXPORT_ROWS}.`,
-      );
-    }
-    const { data } = await this.payablesService.findAll(status, undefined, search, dateFrom, dateTo, 1, total || 1);
-    const rows = data.map((p: any) => ({
-      id: p.id,
-      title: p.title,
-      product: p.product ?? '',
-      due_date: p.due_date ? new Date(p.due_date).toLocaleDateString('pt-BR') : '',
-      amount: Number(p.amount),
-      amount_paid: Number(p.amount_paid),
-      remaining: Number(p.amount) - Number(p.amount_paid),
-      status: P_STATUS_LABEL[p.status] ?? p.status,
-    }));
-
-    const buffer = await buildExcel('Payables', [
-      { header: 'ID', key: 'id', width: 10 },
-      { header: 'Title', key: 'title', width: 35 },
-      { header: 'Type', key: 'product', width: 16 },
-      { header: 'Due Date', key: 'due_date', width: 14 },
-      { header: 'Amount (R$)', key: 'amount', width: 16 },
-      { header: 'Paid (R$)', key: 'amount_paid', width: 14 },
-      { header: 'Balance (R$)', key: 'remaining', width: 14 },
-      { header: 'Status', key: 'status', width: 14 },
-    ], rows);
-
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${reportFilename('payables.xlsx')}"`,
-    });
-    res.send(buffer);
-  }
+    @Inject(AZURE_BLOB_SERVICE)
+    private readonly azureBlob: AzureBlobService,
+  ) {}
 
   @Get()
-  @RequirePermission(PERM.PAYABLES.VIEW)
+  @RequirePermission(PERMISSIONS.PAYABLES.VIEW)
   @ApiOperation({ summary: 'List payables' })
-  findAll(
-    @Query('status') status?: string,
-    @Query('client_id') clientId?: string,
-    @Query('instructor_id') instructorId?: string,
-    @Query('employee_id') employeeId?: string,
-    @Query('search') search?: string,
-    @Query('date_from') dateFrom?: string,
-    @Query('date_to') dateTo?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
-    return this.payablesService.findAll(status, clientId ? Number(clientId) : undefined, search, dateFrom, dateTo, Number(page), Number(limit), instructorId ? Number(instructorId) : undefined, employeeId ? Number(employeeId) : undefined);
+  @ApiResponse({ type: PaginatedResponse(Payable) })
+  findAll(@Query() query: FindAllPayablesDto) {
+    return this.payablesService.findAll(query);
+  }
+
+  @Get('stats')
+  @RequirePermission(PERMISSIONS.PAYABLES.VIEW)
+  @ApiOperation({ summary: 'Get payable stats (total amount and amount paid)' })
+  getStats(@Query() query: FindAllPayablesDto) {
+    return this.payablesService.getStats(query);
   }
 
   @Get(':id')
-  @RequirePermission(PERM.PAYABLES.VIEW)
-  @ApiOperation({ summary: 'Get payable details' })
+  @RequirePermission(PERMISSIONS.PAYABLES.VIEW)
+  @ApiOperation({ summary: 'Get payable' })
+  @ApiResponse({ type: Payable })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.payablesService.findOne(id);
   }
 
   @Post()
-  @RequirePermission(PERM.PAYABLES.CREATE)
-  @ApiOperation({ summary: 'Create payable with installments' })
+  @RequirePermission(PERMISSIONS.PAYABLES.CREATE)
+  @ApiOperation({ summary: 'Create payable' })
+  @ApiResponse({ type: Payable })
   create(@Body() dto: CreatePayableDto) {
     return this.payablesService.create(dto);
   }
 
   @Patch(':id')
-  @RequirePermission(PERM.PAYABLES.UPDATE)
+  @RequirePermission(PERMISSIONS.PAYABLES.UPDATE)
   @ApiOperation({ summary: 'Update payable' })
+  @ApiResponse({ type: Payable })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePayableDto) {
     return this.payablesService.update(id, dto);
   }
 
-  @Patch(':id/payments')
-  @RequirePermission(PERM.PAYABLES.UPDATE)
-  @ApiOperation({ summary: 'Register installment payment' })
-  registerPayment(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreatePayablePaymentDto,
-  ) {
-    return this.payablesService.registerPayment(id, dto);
+  @Delete('bulk')
+  @RequirePermission(PERMISSIONS.PAYABLES.DELETE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Bulk delete payables' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.payablesService.bulkDelete(dto.ids);
   }
 
   @Delete(':id')
-  @RequirePermission(PERM.PAYABLES.DELETE)
+  @RequirePermission(PERMISSIONS.PAYABLES.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete payable' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.payablesService.remove(id);
   }
 
+  @Patch(':id/payments')
+  @RequirePermission(PERMISSIONS.PAYABLES.UPDATE)
+  @ApiOperation({ summary: 'Register installment payment' })
+  createPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreatePayablePaymentDto,
+  ) {
+    return this.payablesService.createPayment(id, dto);
+  }
+
   @Delete(':id/payments/:paymentId')
-  @RequirePermission(PERM.PAYABLES.UPDATE)
+  @RequirePermission(PERMISSIONS.PAYABLES.UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reverse payable payment' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
   deletePayment(
     @Param('id', ParseIntPipe) _id: number,
     @Param('paymentId', ParseIntPipe) paymentId: number,
@@ -155,32 +132,63 @@ export class PayablesController {
     return this.payablesService.deletePayment(paymentId);
   }
 
-  @Post(':id/payments/:paymentId/nota-fiscal')
-  @RequirePermission(PERM.PAYABLES.UPDATE)
-  @ApiOperation({ summary: 'Attach invoice (nota fiscal) to payment' })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: notaFiscalStorage('payable-payments'),
-    fileFilter: notaFiscalFilter,
-    limits: { fileSize: 10 * 1024 * 1024 },
-  }))
-  async uploadPaymentNotaFiscal(
+  @Post(':id/payments/:paymentId/invoice')
+  @RequirePermission(PERMISSIONS.PAYABLES.UPDATE)
+  @ApiOperation({ summary: 'Attach invoice to payment' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadPaymentInvoice(
     @Param('paymentId', ParseIntPipe) paymentId: number,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /(pdf|jpeg|png)/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('No file uploaded');
     const payment = await this.payablesService.getPayment(paymentId);
-    deleteNfFile(payment.nota_fiscal_path ?? null);
-    const path = buildNfPath('payable-payments', file.filename);
-    return this.payablesService.setPaymentNotaFiscal(paymentId, path);
+
+    if (payment.file) {
+      await this.azureBlob.delete(payment.file.blob_path);
+    }
+
+    const blobPath = this.azureBlob.buildBlobPath(
+      'invoices/payable-payments',
+      paymentId,
+      file.originalname,
+    );
+
+    const url = await this.azureBlob.upload(
+      blobPath,
+      file.buffer,
+      file.mimetype,
+    );
+
+    return this.payablesService.addPaymentInvoice(paymentId, {
+      url,
+      blob_path: blobPath,
+      original_name: file.originalname,
+      mime_type: file.mimetype,
+      size: file.size,
+    });
   }
 
-  @Delete(':id/payments/:paymentId/nota-fiscal')
-  @RequirePermission(PERM.PAYABLES.UPDATE)
+  @Delete(':id/payments/:paymentId/invoice')
+  @RequirePermission(PERMISSIONS.PAYABLES.UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remove invoice (nota fiscal) from payment' })
-  async deletePaymentNotaFiscal(@Param('paymentId', ParseIntPipe) paymentId: number) {
+  @ApiOperation({ summary: 'Remove invoice from payment' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  async deletePaymentInvoice(
+    @Param('paymentId', ParseIntPipe) paymentId: number,
+  ) {
     const payment = await this.payablesService.getPayment(paymentId);
-    deleteNfFile(payment.nota_fiscal_path ?? null);
-    await this.payablesService.setPaymentNotaFiscal(paymentId, null);
+
+    if (payment.file) {
+      await this.azureBlob.delete(payment.file.blob_path);
+    }
+
+    await this.payablesService.deletePaymentInvoice(paymentId);
   }
 }

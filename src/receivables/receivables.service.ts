@@ -1,58 +1,90 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ReceivablesRepository } from './receivables.repository';
+import { ETitleStatus } from '@common/enums/title-status.enum';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CreateFileData } from 'src/file/interfaces/create-file-data';
+
+import { CreateReceivablePaymentDto } from './dto/create-payment.dto';
 import { CreateReceivableDto } from './dto/create-receivable.dto';
+import { FindAllReceivablesDto } from './dto/find-all-receivables.dto';
 import { UpdateReceivableDto } from './dto/update-receivable.dto';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+import {
+  IReceivablesRepository,
+  RECEIVABLES_REPOSITORY,
+} from './repository/receivables-repository.interface';
 
 @Injectable()
 export class ReceivablesService {
-  constructor(private readonly repo: ReceivablesRepository) {}
+  constructor(
+    @Inject(RECEIVABLES_REPOSITORY)
+    private readonly receivablesRepository: IReceivablesRepository,
+  ) {}
 
-  async findAll(status?: string, search?: string, dateFrom?: string, dateTo?: string, page = 1, limit = 20) {
-    const from = dateFrom ? new Date(dateFrom) : undefined;
-    const to = dateTo ? new Date(dateTo) : undefined;
-    const { data, total } = await this.repo.findAll(status, search, from, to, page, limit);
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  findAll(dto: FindAllReceivablesDto) {
+    return this.receivablesRepository.findAll(dto);
   }
 
   async findOne(id: number) {
-    const r = await this.repo.findById(id);
-    if (!r) throw new NotFoundException(`Receivable ${id} not found`);
-    return r;
+    const receivable = await this.receivablesRepository.findById(id);
+
+    if (!receivable)
+      throw new NotFoundException(`Título recebível ${id} não encontrado`);
+
+    return receivable;
   }
 
   create(dto: CreateReceivableDto) {
-    return this.repo.create(dto);
+    return this.receivablesRepository.create(dto);
   }
 
   async update(id: number, dto: UpdateReceivableDto) {
     await this.findOne(id);
-    return this.repo.update(id, dto);
+    return this.receivablesRepository.update(id, dto);
   }
 
   async delete(id: number) {
-    const r = await this.findOne(id);
-    if (r.status === 1) throw new BadRequestException('Cannot delete a receivable that is already settled');
-    return this.repo.delete(id);
-  }
+    const receivable = await this.findOne(id);
 
-  registerPayment(receivableId: number, dto: CreatePaymentDto) {
-    return this.repo.registerPayment(receivableId, dto);
-  }
+    if (receivable.status === ETitleStatus.PAID)
+      throw new BadRequestException(
+        'Não é possível excluir um recebível já liquidado',
+      );
 
-  async deletePayment(paymentId: number) {
-    const payment = await this.repo.deletePayment(paymentId);
-    if (!payment) throw new NotFoundException(`Payment ${paymentId} not found`);
-    return payment;
+    return this.receivablesRepository.delete(id);
   }
 
   async getPayment(paymentId: number) {
-    const p = await this.repo.findPaymentById(paymentId);
-    if (!p) throw new NotFoundException(`Payment ${paymentId} not found`);
-    return p;
+    const payment = await this.receivablesRepository.findPaymentById(paymentId);
+
+    if (!payment)
+      throw new NotFoundException(`Pagamento ${paymentId} não encontrado`);
+
+    return payment;
   }
 
-  setPaymentNotaFiscal(paymentId: number, path: string | null) {
-    return this.repo.setPaymentNotaFiscal(paymentId, path);
+  createPayment(receivableId: number, dto: CreateReceivablePaymentDto) {
+    return this.receivablesRepository.createPayment(receivableId, dto);
+  }
+
+  async deletePayment(paymentId: number) {
+    await this.getPayment(paymentId);
+    await this.receivablesRepository.deletePayment(paymentId);
+  }
+
+  async attachPaymentInvoice(paymentId: number, fileData: CreateFileData) {
+    await this.getPayment(paymentId);
+    return this.receivablesRepository.attachPaymentInvoice(paymentId, fileData);
+  }
+
+  async removePaymentInvoice(paymentId: number) {
+    await this.getPayment(paymentId);
+    return this.receivablesRepository.removePaymentInvoice(paymentId);
+  }
+
+  bulkDelete(ids: number[]) {
+    return this.receivablesRepository.bulkDelete(ids);
   }
 }

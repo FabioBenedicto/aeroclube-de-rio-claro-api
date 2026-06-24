@@ -1,0 +1,9 @@
+export enum EStakeholder {
+  PEOPLE = 'PEOPLE',
+  STUDENT = 'STUDENT',
+  COMPANY = 'COMPANY',
+  INSTRUCTOR = 'INSTRUCTOR',
+  PARTNER = 'PARTNER',
+  EMPLOYEE = 'EMPLOYEE',
+  NONE = 'NONE',
+}

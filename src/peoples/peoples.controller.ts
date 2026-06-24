@@ -1,129 +1,98 @@
 import {
-  Controller, Get, Post, Patch, Delete, Param, Body, Query,
-  UseGuards, ParseIntPipe, HttpCode, HttpStatus, Res, BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+
+import { PERMISSIONS } from '../common/constants/permissions';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { PERM } from '../common/constants/permissions';
+import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
+import { PaginatedResponse } from '../common/swagger/paginated-response';
+import { CreatePeopleDto } from './dto/create-people.dto';
+import { FindAllPeoplesDto } from './dto/find-all-peoples.dto';
+import { UpdatePeopleDto } from './dto/update-people.dto';
+import { People } from './model/people.model';
 import { PeoplesService } from './peoples.service';
-import { CreatePersonDto } from './dto/create-person.dto';
-import { UpdatePersonDto } from './dto/update-person.dto';
-import { buildExcel, reportFilename } from '../common/utils/excel.util';
-import { ExportThrottle } from '../common/decorators/export-throttle.decorator';
-import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
-
-const CAT_LABEL: Record<string, string> = {
-  instructor: 'Instructor',
-  student: 'Student',
-  partner: 'Partner',
-  employee: 'Employee',
-};
 
 @ApiTags('peoples')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('peoples')
 export class PeoplesController {
-  constructor(private readonly service: PeoplesService) {}
-
-  @Get('export')
-  @RequirePermission(PERM.CUSTOMERS.VIEW)
-  @ExportThrottle()
-  @ApiOperation({ summary: 'Export people to Excel' })
-  async export(
-    @Query('search') search: string,
-    @Query('category') category: string,
-    @Query('date_from') dateFrom: string,
-    @Query('date_to') dateTo: string,
-    @Res() res: Response,
-  ) {
-    const { total } = await this.service.findAll(search, category, dateFrom, dateTo, 1, 1);
-    if (total > MAX_EXPORT_ROWS) {
-      throw new BadRequestException(
-        `There are ${total} records. Use filters to reduce to at most ${MAX_EXPORT_ROWS}.`,
-      );
-    }
-    const { data } = await this.service.findAll(search, category, dateFrom, dateTo, 1, total || 1);
-    const rows = (data as any[]).map((c) => ({
-      id: c.id,
-      name: c.name,
-      cpf: c.cpf ?? '',
-      email: c.email ?? '',
-      phone: c.phone_number ?? '',
-      categories: (c.categories as string[]).map((k) => CAT_LABEL[k] ?? k).join(', '),
-      flight_hour_balance: Number(c.flight_hour_balance ?? 0),
-    }));
-
-    const buffer = await buildExcel('People', [
-      { header: 'ID',           key: 'id',                   width: 10 },
-      { header: 'Name',         key: 'name',                 width: 35 },
-      { header: 'CPF',          key: 'cpf',                  width: 16 },
-      { header: 'E-mail',       key: 'email',                width: 30 },
-      { header: 'Phone',        key: 'phone',                width: 18 },
-      { header: 'Categories',   key: 'categories',           width: 28 },
-      { header: 'Hour balance', key: 'flight_hour_balance',  width: 14 },
-    ], rows);
-
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${reportFilename('peoples.xlsx')}"`,
-    });
-    res.send(buffer);
-  }
+  constructor(private readonly peoplesService: PeoplesService) {}
 
   @Get()
-  @RequirePermission(PERM.CUSTOMERS.VIEW)
+  @RequirePermission(PERMISSIONS.CUSTOMERS.VIEW)
   @ApiOperation({ summary: 'List people with categories' })
-  findAll(
-    @Query('search') search?: string,
-    @Query('category') category?: string,
-    @Query('date_from') dateFrom?: string,
-    @Query('date_to') dateTo?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
-    return this.service.findAll(search, category, dateFrom, dateTo, Number(page), Number(limit));
+  @ApiResponse({ type: PaginatedResponse(People) })
+  findAll(@Query() query: FindAllPeoplesDto) {
+    return this.peoplesService.findAll(query);
   }
 
   @Get('stats')
-  @RequirePermission(PERM.CUSTOMERS.VIEW)
+  @RequirePermission(PERMISSIONS.CUSTOMERS.VIEW)
   @ApiOperation({ summary: 'People statistics' })
   getStats() {
-    return this.service.getStats();
+    return this.peoplesService.getStats();
   }
 
   @Get(':id')
-  @RequirePermission(PERM.CUSTOMERS.VIEW)
+  @RequirePermission(PERMISSIONS.CUSTOMERS.VIEW)
   @ApiOperation({ summary: 'Person details' })
+  @ApiResponse({ type: People })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+    return this.peoplesService.findOne(id);
   }
 
   @Post()
-  @RequirePermission(PERM.CUSTOMERS.CREATE)
+  @RequirePermission(PERMISSIONS.CUSTOMERS.CREATE)
   @ApiOperation({ summary: 'Create person' })
-  create(@Body() dto: CreatePersonDto) {
-    return this.service.create(dto);
+  @ApiResponse({ type: People })
+  create(@Body() dto: CreatePeopleDto) {
+    return this.peoplesService.create(dto);
+  }
+
+  @Delete('bulk')
+  @RequirePermission(PERMISSIONS.CUSTOMERS.DELETE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Bulk delete people' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.peoplesService.bulkDelete(dto.ids);
   }
 
   @Delete(':id')
-  @RequirePermission(PERM.CUSTOMERS.DELETE)
+  @RequirePermission(PERMISSIONS.CUSTOMERS.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete person' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
   delete(@Param('id', ParseIntPipe) id: number) {
-    return this.service.delete(id);
+    return this.peoplesService.delete(id);
   }
 
   @Patch(':id')
-  @RequirePermission(PERM.CUSTOMERS.UPDATE)
+  @RequirePermission(PERMISSIONS.CUSTOMERS.UPDATE)
   @ApiOperation({ summary: 'Update person' })
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdatePersonDto,
-  ) {
-    return this.service.update(id, dto);
+  @ApiResponse({ type: People })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePeopleDto) {
+    return this.peoplesService.update(id, dto);
   }
+
 }

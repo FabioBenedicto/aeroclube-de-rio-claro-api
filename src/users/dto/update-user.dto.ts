@@ -1,30 +1,32 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsArray } from 'class-validator';
-import { Role } from '@prisma/client';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
+
+import { ERoles } from '../enums/roles.enum';
 
 export class UpdateUserDto {
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
   @IsEmail()
   email?: string;
 
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MinLength(6)
   password?: string;
 
-  @ApiPropertyOptional({ enum: Role })
   @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
+  @IsEnum(ERoles)
+  role?: ERoles;
 
-  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

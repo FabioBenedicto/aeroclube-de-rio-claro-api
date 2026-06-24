@@ -1,48 +1,52 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { ReceivablesService } from './receivables.service';
-import { ReceivablesRepository } from './receivables.repository';
+import { Test, TestingModule } from '@nestjs/testing';
 
-const mockRepo = {
-  registerPayment: jest.fn(),
-  findAll: jest.fn(),
-  findById: jest.fn(),
-};
+import { ReceivablesService } from './receivables.service';
+import { FakeReceivablesRepository } from './repository/fake-receivables.repository';
+import { RECEIVABLES_REPOSITORY } from './repository/receivables-repository.interface';
 
 describe('ReceivablesService', () => {
   let service: ReceivablesService;
+  let repo: FakeReceivablesRepository;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReceivablesService,
-        { provide: ReceivablesRepository, useValue: mockRepo },
+        {
+          provide: RECEIVABLES_REPOSITORY,
+          useClass: FakeReceivablesRepository,
+        },
       ],
     }).compile();
 
-    service = module.get<ReceivablesService>(ReceivablesService);
-    jest.clearAllMocks();
+    service = module.get(ReceivablesService);
+    repo = module.get<FakeReceivablesRepository>(RECEIVABLES_REPOSITORY);
+    repo.receivables = [];
+    repo.payments = [];
   });
 
-  it('delegates registerPayment to repository', async () => {
-    const expected = { payment: { id: 1 }, applied_credits: 0, status: 'paid' };
-    mockRepo.registerPayment.mockResolvedValue(expected);
+  it('delegates createPayment to repository', async () => {
+    repo.receivables = [
+      { id: 1, total_amount: 500, amount_received: 0, status: 0 },
+    ];
+    const result = await service.createPayment(1, { amount_received: 500 });
 
-    const result = await service.registerPayment(1, { amount_received: 500 });
-
-    expect(mockRepo.registerPayment).toHaveBeenCalledWith(1, { amount_received: 500 });
-    expect(result).toBe(expected);
-  });
-
-  it('propagates NotFoundException from repository', async () => {
-    mockRepo.registerPayment.mockRejectedValue(new NotFoundException('Receivable 99 not found'));
-
-    await expect(service.registerPayment(99, { amount_received: 100 })).rejects.toThrow(NotFoundException);
+    expect(result).toBeDefined();
+    expect(repo.payments).toHaveLength(1);
   });
 
   it('throws NotFoundException in findOne for unknown receivable', async () => {
-    mockRepo.findById.mockResolvedValue(null);
-
     await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
+  });
+
+  it('returns receivable when found', async () => {
+    repo.receivables = [
+      { id: 1, total_amount: 500, amount_received: 0, status: 0 },
+    ];
+
+    const result = await service.findOne(1);
+
+    expect(result).toMatchObject({ id: 1 });
   });
 });

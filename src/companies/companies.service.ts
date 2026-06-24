@@ -1,36 +1,73 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { CompaniesRepository } from './companies.repository';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
 import { CreateCompanyDto } from './dto/create-company.dto';
+import { FindAllCompaniesDto } from './dto/find-all-companies.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import {
+  COMPANIES_REPOSITORY,
+  ICompaniesRepository,
+} from './repository/companies-repository.interface';
 
 @Injectable()
 export class CompaniesService {
-  constructor(private readonly repo: CompaniesRepository) {}
+  constructor(
+    @Inject(COMPANIES_REPOSITORY)
+    private readonly companiesRepository: ICompaniesRepository,
+  ) {}
 
-  async findAll(search?: string, dateFrom?: string, dateTo?: string, page = 1, limit = 20) {
-    const from = dateFrom ? new Date(dateFrom) : undefined;
-    const to = dateTo ? new Date(dateTo) : undefined;
-    const { data, total } = await this.repo.findAll(search, from, to, page, limit);
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  findAll(query: FindAllCompaniesDto) {
+    return this.companiesRepository.findAll(query);
   }
 
   async findOne(id: number) {
-    const company = await this.repo.findById(id);
-    if (!company) throw new NotFoundException(`Company ${id} not found`);
+    const company = await this.companiesRepository.findById(id);
+
+    if (!company) throw new NotFoundException(`Empresa ${id} não encontrada`);
+
     return company;
   }
 
   async create(dto: CreateCompanyDto) {
-    return this.repo.create(dto);
+    const [byCnpj, byEmail] = await Promise.all([
+      this.companiesRepository.findByCnpj(dto.cnpj),
+      this.companiesRepository.findByEmail(dto.email),
+    ]);
+
+    if (byCnpj) throw new ConflictException('CNPJ já cadastrado');
+    if (byEmail) throw new ConflictException('E-mail já cadastrado');
+
+    return this.companiesRepository.create(dto);
   }
 
   async update(id: number, dto: UpdateCompanyDto) {
     await this.findOne(id);
-    return this.repo.update(id, dto);
+
+    if (dto.cnpj) {
+      const byCnpj = await this.companiesRepository.findByCnpj(dto.cnpj);
+      if (byCnpj && byCnpj.id !== id)
+        throw new ConflictException('CNPJ já cadastrado');
+    }
+
+    if (dto.email) {
+      const byEmail = await this.companiesRepository.findByEmail(dto.email);
+      if (byEmail && byEmail.id !== id)
+        throw new ConflictException('E-mail já cadastrado');
+    }
+
+    return this.companiesRepository.update(id, dto);
   }
 
   async delete(id: number) {
     await this.findOne(id);
-    return this.repo.delete(id);
+    return this.companiesRepository.delete(id);
+  }
+
+  bulkDelete(ids: number[]) {
+    return this.companiesRepository.bulkDelete(ids);
   }
 }

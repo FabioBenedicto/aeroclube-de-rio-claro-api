@@ -1,12 +1,35 @@
-import { IsString, IsArray, IsOptional, IsIn, IsNumber, ValidateNested, Min, Max, IsNotEmpty, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class FilterDto {
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   field: string;
 
   @IsString()
-  @IsIn(['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'in', 'is_null', 'is_not_null'])
+  @IsIn([
+    'eq',
+    'neq',
+    'contains',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'in',
+    'is_null',
+    'is_not_null',
+  ])
   operator: string;
 
   @IsOptional()
@@ -14,30 +37,53 @@ export class FilterDto {
 }
 
 export class AggregationDto {
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   field: string;
 
   @IsString()
   @IsIn(['sum', 'count', 'avg', 'min', 'max'])
   fn: string;
 
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   alias: string;
 }
 
 export class QueryReportDto {
   @IsString()
-  @IsIn(['receivable', 'payable', 'flight', 'customer', 'bill', 'receivablePayment', 'payablePayment', 'company', 'partner', 'instructor', 'plane'])
+  @IsIn([
+    'receivable',
+    'payable',
+    'flight',
+    'people',
+    'bill',
+    'receivablePayment',
+    'payablePayment',
+    'company',
+    'partner',
+    'instructor',
+    'aircraft',
+    'receivableType',
+    'payableType',
+    'address',
+    'student',
+    'employee',
+    'cnabRemessa',
+    'file',
+  ])
   entity: string;
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  columns: string[];
+  columns?: string[];
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FilterDto)
-  filters: FilterDto[];
+  filters?: FilterDto[];
 
   @IsOptional()
   @IsArray()

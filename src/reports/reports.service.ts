@@ -1,36 +1,68 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { QueryReportDto, AggregationDto, RawQueryDto } from './dto/query-report.dto';
-import { ENTITY_SCHEMAS, ENTITY_INCLUDE, ENTITY_MODEL, JOIN_DEFS, FieldDef } from './entity-schemas';
+import {
+  AggregationDto,
+  QueryReportDto,
+  RawQueryDto,
+} from './dto/query-report.dto';
+import {
+  ENTITY_INCLUDE,
+  ENTITY_MODEL,
+  ENTITY_SCHEMAS,
+  FieldDef,
+  JOIN_DEFS,
+} from './entity-schemas';
 
 function buildNested(path: string[], value: any): Record<string, any> {
-  return [...path].reverse().reduce((acc, key) => ({ [key]: acc }), value as any);
+  return [...path].reverse().reduce((acc, key) => ({ [key]: acc }), value);
 }
 
-function buildCondition(field: FieldDef, operator: string, rawValue: any): Record<string, any> | null {
+function buildCondition(
+  field: FieldDef,
+  operator: string,
+  rawValue: any,
+): Record<string, any> | null {
   const path = field.whereKey ?? (field.dbField ? [field.dbField] : null);
   if (!path) return null;
 
   if (operator === 'is_null') return buildNested(path, null);
   if (operator === 'is_not_null') return buildNested(path, { not: null });
 
-  const value = field.coerce ? field.coerce(rawValue) : (
-    field.type === 'number' ? Number(rawValue) :
-    field.type === 'date' ? new Date(rawValue as string) :
-    rawValue
-  );
+  const value = field.coerce
+    ? field.coerce(rawValue)
+    : field.type === 'number'
+      ? Number(rawValue)
+      : field.type === 'date'
+        ? new Date(rawValue as string)
+        : rawValue;
 
   const cond: any = (() => {
     switch (operator) {
-      case 'eq':       return field.type === 'string' ? { equals: value, mode: 'insensitive' } : { equals: value };
-      case 'neq':      return { not: value };
-      case 'contains': return { contains: value, mode: 'insensitive' };
-      case 'gt':       return { gt: value };
-      case 'gte':      return { gte: value };
-      case 'lt':       return { lt: value };
-      case 'lte':      return { lte: value };
-      case 'in':       return { in: Array.isArray(rawValue) ? rawValue.map(field.coerce ?? (v => v)) : [value] };
-      default:         return null;
+      case 'eq':
+        return field.type === 'string'
+          ? { equals: value, mode: 'insensitive' }
+          : { equals: value };
+      case 'neq':
+        return { not: value };
+      case 'contains':
+        return { contains: value, mode: 'insensitive' };
+      case 'gt':
+        return { gt: value };
+      case 'gte':
+        return { gte: value };
+      case 'lt':
+        return { lt: value };
+      case 'lte':
+        return { lte: value };
+      case 'in':
+        return {
+          in: Array.isArray(rawValue)
+            ? rawValue.map(field.coerce ?? ((v) => v))
+            : [value],
+        };
+      default:
+        return null;
     }
   })();
 
@@ -41,20 +73,39 @@ function buildCondition(field: FieldDef, operator: string, rawValue: any): Recor
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private computeBaseInclude(entity: string, fields: FieldDef[]): any {
+    const entityInclude = ENTITY_INCLUDE[entity] ?? {};
+    const result: Record<string, any> = {};
+    for (const field of fields) {
+      if (!field.whereKey || field.whereKey.length <= 1) continue;
+      const topKey = field.whereKey[0];
+      if (topKey in entityInclude && !(topKey in result)) {
+        result[topKey] = entityInclude[topKey];
+      }
+    }
+    return result;
+  }
+
   buildMergedSchema(dto: QueryReportDto): { schema: FieldDef[]; include: any } {
     const schema = ENTITY_SCHEMAS[dto.entity];
-    if (!schema) throw new BadRequestException(`Entidade desconhecida: ${dto.entity}`);
+
+    if (!schema)
+      throw new BadRequestException(`Entidade desconhecida: ${dto.entity}`);
 
     const mergedSchema: FieldDef[] = [...schema];
-    const mergedInclude: any = { ...(ENTITY_INCLUDE[dto.entity] ?? {}) };
+    const mergedInclude: any = {};
 
     for (const joinKey of dto.joins ?? []) {
       const joinDef = JOIN_DEFS[dto.entity]?.[joinKey];
-      if (!joinDef) throw new BadRequestException(`Join desconhecido para ${dto.entity}: ${joinKey}`);
+      if (!joinDef)
+        throw new BadRequestException(
+          `Join desconhecido para ${dto.entity}: ${joinKey}`,
+        );
 
       Object.assign(mergedInclude, joinDef.include);
 
       const joinedSchema = ENTITY_SCHEMAS[joinDef.entity] ?? [];
+
       for (const field of joinedSchema) {
         mergedSchema.push({
           ...field,
@@ -69,16 +120,23 @@ export class ReportsService {
       }
     }
 
-    return { schema: mergedSchema, include: mergedInclude };
+    return {
+      schema: mergedSchema,
+      include: mergedInclude,
+    };
   }
 
   async query(dto: QueryReportDto): Promise<Record<string, any>[]> {
-    const { schema: mergedSchema, include: mergedInclude } = this.buildMergedSchema(dto);
+    const { schema: mergedSchema, include: mergedInclude } =
+      this.buildMergedSchema(dto);
 
     const AND: any[] = [];
     for (const filter of dto.filters ?? []) {
-      const field = mergedSchema.find(s => s.key === filter.field);
-      if (!field) throw new BadRequestException(`Campo de filtro desconhecido: ${filter.field}`);
+      const field = mergedSchema.find((s) => s.key === filter.field);
+      if (!field)
+        throw new BadRequestException(
+          `Campo de filtro desconhecido: ${filter.field}`,
+        );
       const cond = buildCondition(field, filter.operator, filter.value);
       if (cond) AND.push(cond);
     }
@@ -86,22 +144,46 @@ export class ReportsService {
     const limit = Math.min(dto.limit ?? 500, 1000);
 
     if (dto.groupBy?.length) {
-      return this.runGrouped(dto.entity, mergedSchema, where, dto.groupBy, dto.aggregations ?? [], limit, mergedInclude);
+      return this.runGrouped(
+        dto.entity,
+        mergedSchema,
+        where,
+        dto.groupBy,
+        dto.aggregations ?? [],
+        limit,
+        mergedInclude,
+      );
     }
 
-    const requestedFields = dto.columns.map(key => {
-      const f = mergedSchema.find(s => s.key === key);
+    const requestedFields = (dto.columns ?? []).map((key) => {
+      const f = mergedSchema.find((s) => s.key === key);
       if (!f) throw new BadRequestException(`Campo desconhecido: ${key}`);
       return f;
     });
 
-    return this.runFind(dto.entity, requestedFields, where, limit, mergedInclude);
+    return this.runFind(
+      dto.entity,
+      requestedFields,
+      where,
+      limit,
+      mergedInclude,
+    );
   }
 
-  private async runFind(entity: string, fields: FieldDef[], where: any, limit: number, include?: any) {
+  private async runFind(
+    entity: string,
+    fields: FieldDef[],
+    where: any,
+    limit: number,
+    include?: any,
+  ) {
+    const finalInclude = {
+      ...this.computeBaseInclude(entity, fields),
+      ...(include ?? {}),
+    };
     const rows = await (this.prisma as any)[ENTITY_MODEL[entity]].findMany({
       where,
-      include: include ?? ENTITY_INCLUDE[entity] ?? {},
+      include: finalInclude,
       take: limit,
       orderBy: { id: 'asc' },
     });
@@ -112,34 +194,58 @@ export class ReportsService {
     });
   }
 
+  private extractPrismaMessage(err: any): string {
+    const meta: string | undefined = err?.meta?.message;
+
+    if (meta) return meta.trim();
+
+    const msg: string = err?.message ?? String(err);
+
+    const match = msg.match(/Message:\s*`?([^`\n]+)`?/i);
+
+    if (match) return match[1].trim();
+
+    return (
+      msg
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.length > 0) ?? msg
+    );
+  }
+
+  private serializeValue(val: unknown): unknown {
+    if (val instanceof Date) return val.toISOString();
+    if (typeof val === 'bigint') return Number(val);
+    if (val !== null && typeof (val as any).toNumber === 'function')
+      return (val as any).toNumber();
+    return val;
+  }
+
   async rawQuery(dto: RawQueryDto): Promise<Record<string, any>[]> {
     const sql = dto.sql.trim();
+
     if (!/^select\b/i.test(sql)) {
-      throw new BadRequestException('Only SELECT queries are allowed');
+      throw new BadRequestException('Apenas consultas SELECT são permitidas');
     }
+
     let rows: any[];
+
     try {
       rows = await this.prisma.$queryRawUnsafe(sql);
-    } catch (err: any) {
-      const meta: string | undefined = err?.meta?.message;
-      if (meta) throw new BadRequestException(`Erro na consulta SQL: ${meta.trim()}`);
-      const msg: string = err?.message ?? String(err);
-      const match = msg.match(/Message:\s*`?([^`\n]+)`?/i);
-      if (match) throw new BadRequestException(`Erro na consulta SQL: ${match[1].trim()}`);
-      const firstLine = msg.split('\n').map(l => l.trim()).find(l => l.length > 0) ?? msg;
-      throw new BadRequestException(`Erro na consulta SQL: ${firstLine}`);
+    } catch (error) {
+      throw new BadRequestException(
+        `Erro na consulta SQL: ${this.extractPrismaMessage(error)}`,
+      );
     }
-    return rows.map((row: any) => {
-      const result: Record<string, any> = {};
-      for (const key of Object.keys(row)) {
-        const val = row[key];
-        if (val instanceof Date) result[key] = val.toISOString();
-        else if (typeof val === 'bigint') result[key] = Number(val);
-        else if (val?.toNumber) result[key] = val.toNumber();
-        else result[key] = val;
-      }
-      return result;
-    });
+
+    return rows.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, val]) => [
+          key,
+          this.serializeValue(val),
+        ]),
+      ),
+    );
   }
 
   private async runGrouped(
@@ -151,14 +257,20 @@ export class ReportsService {
     limit: number,
     _include?: any,
   ) {
-    const groupFields = groupByKeys.map(key => {
-      const f = schema.find(s => s.key === key);
-      if (!f) throw new BadRequestException(`Campo de agrupamento desconhecido: ${key}`);
-      if (!f.groupable || !f.dbField) throw new BadRequestException(`Field "${f?.label ?? key}" does not support grouping`);
+    const groupFields = groupByKeys.map((key) => {
+      const f = schema.find((s) => s.key === key);
+      if (!f)
+        throw new BadRequestException(
+          `Campo de agrupamento desconhecido: ${key}`,
+        );
+      if (!f.groupable || !f.dbField)
+        throw new BadRequestException(
+          `O campo "${f?.label ?? key}" não suporta agrupamento`,
+        );
       return f;
     });
 
-    const by = groupFields.map(f => f.dbField!) as any;
+    const by = groupFields.map((f) => f.dbField!) as any;
     const _sum: Record<string, boolean> = {};
     const _avg: Record<string, boolean> = {};
     const _min: Record<string, boolean> = {};
@@ -169,9 +281,11 @@ export class ReportsService {
       if (agg.fn === 'count') {
         hasCount = true;
       } else {
-        const aggField = schema.find(s => s.key === agg.field);
+        const aggField = schema.find((s) => s.key === agg.field);
         if (!aggField?.aggregatable || !aggField.dbField) {
-          throw new BadRequestException(`Field "${aggField?.label ?? agg.field}" does not support aggregation`);
+          throw new BadRequestException(
+            `O campo "${aggField?.label ?? agg.field}" não suporta agregação`,
+          );
         }
         if (agg.fn === 'sum') _sum[aggField.dbField] = true;
         else if (agg.fn === 'avg') _avg[aggField.dbField] = true;
@@ -180,7 +294,9 @@ export class ReportsService {
       }
     }
 
-    const groupResult: any[] = await (this.prisma as any)[ENTITY_MODEL[entity]].groupBy({
+    const groupResult: any[] = await (this.prisma as any)[
+      ENTITY_MODEL[entity]
+    ].groupBy({
       by,
       where,
       ...(Object.keys(_sum).length && { _sum }),
@@ -198,13 +314,16 @@ export class ReportsService {
         let val = row[f.dbField!];
         if (val instanceof Date) val = val.toISOString().split('T')[0];
         else if (val?.toNumber) val = val.toNumber();
-        result[f.key] = val !== null && val !== undefined ? f.extract({ [f.dbField!]: val }) : null;
+        result[f.key] =
+          val !== null && val !== undefined
+            ? f.extract({ [f.dbField!]: val })
+            : null;
       }
       for (const agg of aggregations) {
         if (agg.fn === 'count') {
           result[agg.alias] = row._count?.id ?? 0;
         } else {
-          const aggField = schema.find(s => s.key === agg.field)!;
+          const aggField = schema.find((s) => s.key === agg.field)!;
           const raw = row[`_${agg.fn}`]?.[aggField.dbField!];
           result[agg.alias] = raw != null ? Number(raw) : null;
         }

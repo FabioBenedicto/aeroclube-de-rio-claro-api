@@ -1,8 +1,7 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class UpdateReceivableTypeDto {
-  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  name?: string;
+  name: string;
 }

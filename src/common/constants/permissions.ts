@@ -1,4 +1,4 @@
-export const PERM = {
+export const PERMISSIONS = {
   RECEIVABLES: {
     VIEW: 'receivables:view',
     CREATE: 'receivables:create',

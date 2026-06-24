@@ -1,18 +1,19 @@
+import { ERecurrence } from '@common/enums/recurrence.enum';
+import { EStakeholder } from '@common/enums/stakeholder.enum';
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, TitleStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client-runtime-utils';
 import { plainToInstance } from 'class-transformer';
 import { addMonths, addWeeks, addYears, endOfDay, startOfDay } from 'date-fns';
+import { ETitleStatus } from 'src/common/enums/title-status.enum';
+import { CreateFileData } from 'src/file/interfaces/create-file-data';
+import { Prisma } from 'src/generated/prisma/client';
 
-import { paginate } from '../../common/dto/pagination.dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Recurrence } from '../../shared/enums/recurrence.enum';
-import { Stakeholder } from '../../shared/enums/stakeholder.enum';
-import { CreateFileData } from '../../shared/interfaces/create-file-data';
 import { CreateReceivablePaymentDto } from '../dto/create-payment.dto';
 import { CreateReceivableDto } from '../dto/create-receivable.dto';
 import { FindAllReceivablesDto } from '../dto/find-all-receivables.dto';
@@ -21,87 +22,27 @@ import { Receivable } from '../model/receivable.model';
 import { ReceivablePayment } from '../model/receivable-payment.model';
 import { IReceivablesRepository } from './receivables-repository.interface';
 
-const include = {
+const receivablesInclude = {
+  receivable_type: true,
   people: true,
   student: { include: { people: true } },
+  partner: { include: { people: true } },
+  instructor: { include: { people: true } },
+  employee: { include: { people: true } },
   company: true,
   aircraft: true,
-  instructor: { include: { people: true } },
-  partner: { include: { people: true } },
-  employee: { include: { people: true } },
+  flight: {
+    include: {
+      aircraft: true,
+      people: true,
+      instructor: { include: { people: true } },
+    },
+  },
   payments: {
     orderBy: { payment_date: Prisma.SortOrder.desc },
     include: { file: true },
   },
-  flight: { include: { aircraft: true, people: true } },
-  receivable_type: true,
 };
-
-type ReceivableRaw = Prisma.ReceivableGetPayload<{ include: typeof include }>;
-
-function normalizePerson(p: any) {
-  return { ...p, credit_balance: Number(p.credit_balance) };
-}
-
-function normalizeAircraft(p: any) {
-  return {
-    ...p,
-    flight_hour_value:
-      p.flight_hour_value !== null ? Number(p.flight_hour_value) : null,
-  };
-}
-
-function normalizeFlightRaw(f: any) {
-  return {
-    ...f,
-    total_hours: f.total_hours !== null ? Number(f.total_hours) : null,
-    total_amount: f.total_amount !== null ? Number(f.total_amount) : null,
-    aircraft: f.aircraft ? normalizeAircraft(f.aircraft) : f.aircraft,
-    people: f.people ? normalizePerson(f.people) : f.people,
-  };
-}
-
-function toReceivable(raw: ReceivableRaw): Receivable {
-  return plainToInstance(Receivable, {
-    ...raw,
-    total_amount: Number(raw.total_amount),
-    amount_received: Number(raw.amount_received),
-    people: raw.people ? normalizePerson(raw.people) : raw.people,
-    student: raw.student
-      ? { ...raw.student, people: normalizePerson(raw.student.people) }
-      : raw.student,
-    company: raw.company ?? raw.company,
-    flight: raw.flight ? normalizeFlightRaw(raw.flight) : raw.flight,
-    aircraft: raw.aircraft ? normalizeAircraft(raw.aircraft) : raw.aircraft,
-    instructor: raw.instructor
-      ? {
-          ...raw.instructor,
-          people: normalizePerson(raw.instructor.people),
-        }
-      : raw.instructor,
-    partner: raw.partner
-      ? {
-          ...raw.partner,
-          monthly_dues: Number(raw.partner.monthly_dues),
-          people: normalizePerson(raw.partner.people),
-        }
-      : raw.partner,
-    employee: raw.employee
-      ? { ...raw.employee, people: normalizePerson(raw.employee.people) }
-      : raw.employee,
-    payments: raw.payments?.map((p: any) => ({
-      ...p,
-      amount: Number(p.amount),
-    })),
-  });
-}
-
-function toReceivablePayment(raw: any): ReceivablePayment {
-  return plainToInstance(ReceivablePayment, {
-    ...raw,
-    amount: Number(raw.amount),
-  });
-}
 
 @Injectable()
 export class ReceivablesRepository implements IReceivablesRepository {
@@ -112,20 +53,25 @@ export class ReceivablesRepository implements IReceivablesRepository {
     search,
     date_from,
     date_to,
+    people_id,
     page = 1,
     limit = 20,
   }: FindAllReceivablesDto) {
     const now = new Date();
+
     const AND: Prisma.ReceivableWhereInput[] = [];
 
     if (status === '1') {
-      AND.push({ status: TitleStatus.PAID });
+      AND.push({ status: ETitleStatus.PAID });
     } else if (status === '0') {
-      AND.push({ status: TitleStatus.OPEN, expiration_date: { gte: now } });
+      AND.push({ status: ETitleStatus.PENDING, expiration_date: { gte: now } });
     } else if (status === 'partial') {
-      AND.push({ status: TitleStatus.PARTIAL });
+      AND.push({ status: ETitleStatus.PARTIAL });
     } else if (status === 'overdue') {
-      AND.push({ status: TitleStatus.OPEN, expiration_date: { lt: now } });
+      AND.push({
+        status: { not: ETitleStatus.PAID },
+        expiration_date: { lt: now },
+      });
     }
 
     if (search) {
@@ -136,6 +82,10 @@ export class ReceivablesRepository implements IReceivablesRepository {
           { company: { name: { contains: search, mode: 'insensitive' } } },
         ],
       });
+    }
+
+    if (people_id) {
+      AND.push({ people_id });
     }
 
     if (date_from || date_to) {
@@ -150,8 +100,10 @@ export class ReceivablesRepository implements IReceivablesRepository {
     const where: Prisma.ReceivableWhereInput = AND.length > 0 ? { AND } : {};
     const args: Prisma.ReceivableFindManyArgs = {
       where,
-      orderBy: { created_at: 'desc' },
-      include,
+      orderBy: {
+        created_at: 'desc',
+      },
+      include: receivablesInclude,
       skip: (page - 1) * limit,
       take: limit,
     };
@@ -161,23 +113,28 @@ export class ReceivablesRepository implements IReceivablesRepository {
       this.prisma.receivable.count({ where }),
     ]);
 
-    return paginate(data.map(toReceivable), total, page, limit);
+    return {
+      data: data.map((item) => plainToInstance(Receivable, item)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findById(id: number) {
     const raw = await this.prisma.receivable.findUnique({
       where: { id },
-      include,
+      include: receivablesInclude,
     });
 
-    return raw ? toReceivable(raw) : null;
+    return raw ? plainToInstance(Receivable, raw) : null;
   }
 
   async create({
     person_id,
     student_id,
     company_id,
-    bill_id,
     plane_id,
     flight_id,
     instructor_id,
@@ -189,30 +146,32 @@ export class ReceivablesRepository implements IReceivablesRepository {
     ...dto
   }: CreateReceivableDto) {
     const receiverRelation = {
-      [Stakeholder.PEOPLE]: { people: { connect: { id: person_id } } },
-      [Stakeholder.STUDENT]: { student: { connect: { id: student_id } } },
-      [Stakeholder.COMPANY]: { company: { connect: { id: company_id } } },
-      [Stakeholder.INSTRUCTOR]: {
+      [EStakeholder.PEOPLE]: { people: { connect: { id: person_id } } },
+      [EStakeholder.STUDENT]: { student: { connect: { id: student_id } } },
+      [EStakeholder.COMPANY]: { company: { connect: { id: company_id } } },
+      [EStakeholder.INSTRUCTOR]: {
         instructor: { connect: { id: instructor_id } },
       },
-      [Stakeholder.PARTNER]: { partner: { connect: { id: partner_id } } },
-      [Stakeholder.EMPLOYEE]: { employee: { connect: { id: employee_id } } },
-      [Stakeholder.NONE]: {},
-    }[dto.stakeholder ?? Stakeholder.NONE];
+      [EStakeholder.PARTNER]: { partner: { connect: { id: partner_id } } },
+      [EStakeholder.EMPLOYEE]: { employee: { connect: { id: employee_id } } },
+      [EStakeholder.NONE]: {},
+    }[dto.stakeholder ?? EStakeholder.NONE];
 
     const relations = {
       ...receiverRelation,
       ...(plane_id && { aircraft: { connect: { id: plane_id } } }),
       ...(flight_id && { flight: { connect: { id: flight_id } } }),
-      receivable_type: { connect: { id: receivable_type_id } },
+      ...(receivable_type_id && {
+        receivable_type: { connect: { id: receivable_type_id } },
+      }),
     };
 
     if (recurrence) {
       const expirations_date = Array.from({ length: occurrences }, (_, i) => {
         return {
-          [Recurrence.WEEKLY]: addWeeks(dto.expiration_date, i),
-          [Recurrence.MONTHLY]: addMonths(dto.expiration_date, i),
-          [Recurrence.YEARLY]: addYears(dto.expiration_date, i),
+          [ERecurrence.WEEKLY]: addWeeks(dto.expiration_date, i),
+          [ERecurrence.MONTHLY]: addMonths(dto.expiration_date, i),
+          [ERecurrence.YEARLY]: addYears(dto.expiration_date, i),
         }[recurrence];
       });
 
@@ -225,12 +184,12 @@ export class ReceivablesRepository implements IReceivablesRepository {
               expiration_date,
               title: `${dto.title} (${i + 1}/${occurrences})`,
             },
-            include,
+            include: receivablesInclude,
           }),
         ),
       );
 
-      return results.map(toReceivable);
+      return results.map((item) => plainToInstance(Receivable, item));
     }
 
     const result = await this.prisma.receivable.create({
@@ -238,10 +197,10 @@ export class ReceivablesRepository implements IReceivablesRepository {
         ...dto,
         ...relations,
       },
-      include,
+      include: receivablesInclude,
     });
 
-    return toReceivable(result);
+    return plainToInstance(Receivable, result);
   }
 
   async update(
@@ -250,7 +209,6 @@ export class ReceivablesRepository implements IReceivablesRepository {
       person_id,
       student_id,
       company_id,
-      bill_id,
       plane_id,
       flight_id,
       instructor_id,
@@ -263,43 +221,45 @@ export class ReceivablesRepository implements IReceivablesRepository {
     const payerRelation =
       dto.stakeholder &&
       {
-        [Stakeholder.PEOPLE]: {
+        [EStakeholder.PEOPLE]: {
           people: person_id
             ? { connect: { id: person_id } }
             : { disconnect: true },
         },
-        [Stakeholder.STUDENT]: {
+        [EStakeholder.STUDENT]: {
           student: student_id
             ? { connect: { id: student_id } }
             : { disconnect: true },
         },
-        [Stakeholder.COMPANY]: {
+        [EStakeholder.COMPANY]: {
           company: company_id
             ? { connect: { id: company_id } }
             : { disconnect: true },
         },
-        [Stakeholder.INSTRUCTOR]: {
+        [EStakeholder.INSTRUCTOR]: {
           instructor: instructor_id
             ? { connect: { id: instructor_id } }
             : { disconnect: true },
         },
-        [Stakeholder.PARTNER]: {
+        [EStakeholder.PARTNER]: {
           partner: partner_id
             ? { connect: { id: partner_id } }
             : { disconnect: true },
         },
-        [Stakeholder.EMPLOYEE]: {
+        [EStakeholder.EMPLOYEE]: {
           employee: employee_id
             ? { connect: { id: employee_id } }
             : { disconnect: true },
         },
-        [Stakeholder.NONE]: {},
+        [EStakeholder.NONE]: {},
       }[dto.stakeholder];
 
     const relations = {
       ...payerRelation,
       ...(plane_id !== undefined && {
-        aircraft: plane_id ? { connect: { id: plane_id } } : { disconnect: true },
+        aircraft: plane_id
+          ? { connect: { id: plane_id } }
+          : { disconnect: true },
       }),
       ...(flight_id !== undefined && {
         flight: flight_id
@@ -320,13 +280,19 @@ export class ReceivablesRepository implements IReceivablesRepository {
       include: {
         people: true,
         company: true,
-        flight: { include: { aircraft: true, people: true } },
+        flight: {
+          include: {
+            aircraft: true,
+            people: true,
+            instructor: { include: { people: true } },
+          },
+        },
         aircraft: true,
         receivable_type: true,
       },
     });
 
-    return toReceivable(raw as ReceivableRaw);
+    return plainToInstance(Receivable, raw);
   }
 
   async delete(id: number) {
@@ -339,20 +305,19 @@ export class ReceivablesRepository implements IReceivablesRepository {
       include: { file: true },
     });
 
-    return raw ? toReceivablePayment(raw) : null;
+    return raw ? plainToInstance(ReceivablePayment, raw) : null;
   }
 
   async createPayment(receivableId: number, dto: CreateReceivablePaymentDto) {
     return this.prisma.$transaction(async (tx) => {
       const receivable = await tx.receivable.findUnique({
         where: { id: receivableId },
-        include: { receivable_type: true },
       });
 
       if (!receivable)
         throw new NotFoundException(`Recebível ${receivableId} não encontrado`);
 
-      if (receivable.status === TitleStatus.PAID)
+      if (receivable.status === ETitleStatus.PAID)
         throw new BadRequestException('Recebível já liquidado');
 
       const paymentDate = dto.payment_date
@@ -400,24 +365,20 @@ export class ReceivablesRepository implements IReceivablesRepository {
             payment_date: paymentDate,
           },
         });
-        cashPayment = toReceivablePayment(raw);
+        cashPayment = plainToInstance(ReceivablePayment, raw);
       }
 
       const newAmountReceived = receivable.amount_received.add(totalApplied);
       const newStatus = newAmountReceived.gte(receivable.total_amount)
-        ? TitleStatus.PAID
-        : TitleStatus.PARTIAL;
+        ? ETitleStatus.PAID
+        : ETitleStatus.PARTIAL;
 
       await tx.receivable.update({
         where: { id: receivableId },
         data: { amount_received: newAmountReceived, status: newStatus },
       });
 
-      if (
-        receivable.receivable_type?.name === 'CREDIT' &&
-        receivable.people_id &&
-        cashAmount.gt(0)
-      ) {
+      if (receivable.adds_credit && receivable.people_id && cashAmount.gt(0)) {
         await tx.people.update({
           where: { id: receivable.people_id },
           data: { credit_balance: { increment: cashAmount.toNumber() } },
@@ -426,7 +387,7 @@ export class ReceivablesRepository implements IReceivablesRepository {
 
       return {
         payment: cashPayment,
-        status: newStatus === TitleStatus.PAID ? 'paid' : 'partial',
+        status: newStatus === ETitleStatus.PAID ? 'paid' : 'partial',
       };
     });
   }
@@ -439,7 +400,6 @@ export class ReceivablesRepository implements IReceivablesRepository {
 
       const receivable = await tx.receivable.findUniqueOrThrow({
         where: { id: payment.receivable_id },
-        include: { receivable_type: true },
       });
 
       if (receivable) {
@@ -451,13 +411,13 @@ export class ReceivablesRepository implements IReceivablesRepository {
           data: {
             amount_received: newAmountReceived.lte(0) ? 0 : newAmountReceived,
             status: newAmountReceived.lte(0)
-              ? TitleStatus.OPEN
-              : TitleStatus.PARTIAL,
+              ? ETitleStatus.PENDING
+              : ETitleStatus.PARTIAL,
           },
         });
 
         if (
-          receivable.receivable_type?.name === 'CREDIT' &&
+          receivable.adds_credit &&
           receivable.people_id &&
           payment.method !== 'Credit'
         ) {
@@ -476,37 +436,61 @@ export class ReceivablesRepository implements IReceivablesRepository {
     });
   }
 
-  async addPaymentInvoice(paymentId: number, fileData: CreateFileData) {
+  async attachPaymentInvoice(paymentId: number, fileData: CreateFileData) {
     const raw = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.receivablePayment.findUnique({
         where: { id: paymentId },
         select: { file_id: true },
       });
+
       if (existing?.file_id) {
         await tx.file.delete({ where: { id: existing.file_id } });
       }
+
       const file = await tx.file.create({ data: fileData });
+
       return tx.receivablePayment.update({
         where: { id: paymentId },
         data: { file: { connect: { id: file.id } } },
       });
     });
-    return toReceivablePayment(raw);
+
+    return plainToInstance(ReceivablePayment, raw);
   }
 
-  async deletePaymentInvoice(paymentId: number) {
+  async removePaymentInvoice(paymentId: number) {
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.receivablePayment.findUnique({
         where: { id: paymentId },
         select: { file_id: true },
       });
+
       if (existing?.file_id) {
         await tx.receivablePayment.update({
           where: { id: paymentId },
           data: { file: { disconnect: true } },
         });
+
         await tx.file.delete({ where: { id: existing.file_id } });
       }
     });
+  }
+
+  async bulkDelete(ids: number[]): Promise<void> {
+    const count = await this.prisma.receivable.count({
+      where: { id: { in: ids } },
+    });
+    if (count !== ids.length)
+      throw new UnprocessableEntityException(
+        'Um ou mais recebíveis não foram encontrados',
+      );
+    const paidCount = await this.prisma.receivable.count({
+      where: { id: { in: ids }, status: ETitleStatus.PAID },
+    });
+    if (paidCount > 0)
+      throw new UnprocessableEntityException(
+        'Não é possível excluir recebíveis já pagos',
+      );
+    await this.prisma.receivable.deleteMany({ where: { id: { in: ids } } });
   }
 }

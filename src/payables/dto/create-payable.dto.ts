@@ -1,3 +1,5 @@
+import { ERecurrence } from '@common/enums/recurrence.enum';
+import { EStakeholder } from '@common/enums/stakeholder.enum';
 import { Type } from 'class-transformer';
 import {
   IsDate,
@@ -11,12 +13,9 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-import { Recurrence } from '../../shared/enums/recurrence.enum';
-import { Stakeholder } from '../../shared/enums/stakeholder.enum';
-
 export class CreatePayableDto {
-  @IsEnum(Stakeholder)
-  stakeholder: Stakeholder;
+  @IsEnum(EStakeholder)
+  stakeholder: EStakeholder;
 
   @IsInt()
   @IsOptional()
@@ -66,9 +65,9 @@ export class CreatePayableDto {
   @IsOptional()
   payable_type_id?: number;
 
-  @IsEnum(Recurrence)
+  @IsEnum(ERecurrence)
   @IsOptional()
-  recurrence?: Recurrence;
+  recurrence?: ERecurrence;
 
   @IsInt()
   @Min(2)

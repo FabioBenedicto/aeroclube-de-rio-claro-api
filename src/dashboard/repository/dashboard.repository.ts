@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from 'src/generated/prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
 
-import { PrismaService } from '../../prisma/prisma.service';
 import {
   DashboardData,
   IDashboardRepository,
@@ -9,12 +9,12 @@ import {
 
 type RawRow = {
   totalReceivables: Prisma.Decimal;
-  openReceivables:  Prisma.Decimal;
-  totalPayables:    Prisma.Decimal;
-  openPayables:     Prisma.Decimal;
-  flightsToday:     bigint;
-  inFlight:         bigint;
-  activePeople:     bigint;
+  openReceivables: Prisma.Decimal;
+  totalPayables: Prisma.Decimal;
+  openPayables: Prisma.Decimal;
+  flightsToday: bigint;
+  inFlight: bigint;
+  activePeople: bigint;
 };
 
 @Injectable()
@@ -38,12 +38,12 @@ export class DashboardRepository implements IDashboardRepository {
 
     return {
       totalReceivables: row.totalReceivables.toNumber(),
-      openReceivables:  row.openReceivables.toNumber(),
-      totalPayables:    row.totalPayables.toNumber(),
-      openPayables:     row.openPayables.toNumber(),
-      flightsToday:     Number(row.flightsToday),
-      inFlight:         Number(row.inFlight),
-      activePeople:     Number(row.activePeople),
+      openReceivables: row.openReceivables.toNumber(),
+      totalPayables: row.totalPayables.toNumber(),
+      openPayables: row.openPayables.toNumber(),
+      flightsToday: Number(row.flightsToday),
+      inFlight: Number(row.inFlight),
+      activePeople: Number(row.activePeople),
     };
   }
 }

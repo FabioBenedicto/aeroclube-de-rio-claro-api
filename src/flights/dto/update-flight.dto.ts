@@ -1,39 +1,28 @@
 import {
-  IsInt,
-  IsString,
-  IsBoolean,
   IsDateString,
-  IsOptional,
+  IsInt,
   IsNotEmpty,
-  IsEnum,
+  IsOptional,
+  IsString,
 } from 'class-validator';
-import { AircraftType } from '../enums/aircraft-type.enum';
 
 export class UpdateFlightDto {
   @IsInt()
   @IsOptional()
-  plane_id?: number;
+  aircraft_id?: number;
 
   @IsInt()
   @IsOptional()
-  customer_id?: number;
+  people_id?: number;
 
   @IsInt()
   @IsOptional()
   instructor_id?: number | null;
 
-  @IsEnum(AircraftType)
-  @IsOptional()
-  aircraft_type?: AircraftType;
-
   @IsString()
   @IsNotEmpty()
   @IsOptional()
   type?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  double_command?: boolean;
 
   @IsString()
   @IsNotEmpty()

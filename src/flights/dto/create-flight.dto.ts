@@ -1,34 +1,26 @@
+import { Type } from 'class-transformer';
 import {
-  IsInt,
-  IsString,
-  IsBoolean,
   IsDateString,
-  IsOptional,
+  IsInt,
   IsNotEmpty,
-  IsEnum,
+  IsOptional,
+  IsString,
 } from 'class-validator';
-import { AircraftType } from '../enums/aircraft-type.enum';
 
 export class CreateFlightDto {
   @IsInt()
-  plane_id: number;
+  aircraft_id: number;
 
   @IsInt()
-  customer_id: number;
+  people_id: number;
 
   @IsInt()
   @IsOptional()
   instructor_id?: number;
 
-  @IsEnum(AircraftType)
-  aircraft_type: AircraftType;
-
   @IsString()
   @IsNotEmpty()
   type: string;
-
-  @IsBoolean()
-  double_command: boolean;
 
   @IsString()
   @IsNotEmpty()
@@ -49,13 +41,26 @@ export class CreateFlightDto {
   @IsOptional()
   receivable_title?: string;
 
+  @IsString()
+  @IsOptional()
+  receivable_description?: string;
+
   @IsDateString()
   @IsOptional()
   receivable_expiration_date?: string;
 
+  @IsInt()
+  @Type(() => Number)
+  receivable_type_id: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  payable_type_id?: number;
+
   @IsString()
   @IsOptional()
-  receivable_product?: string;
+  payable_description?: string;
 
   @IsString()
   @IsOptional()

@@ -1,21 +1,23 @@
-import { IsNumber, IsOptional, IsString, IsDateString, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  Min,
+} from 'class-validator';
+
+import { EPaymentMethod } from '../../common/enums/payment-method.enum';
 
 export class CreatePayablePaymentDto {
   @IsNumber()
   @Min(0.01)
-  @Type(() => Number)
   amount: number;
 
-  @IsString()
+  @IsEnum(EPaymentMethod)
   @IsOptional()
-  method?: string;
-
-  @IsString()
-  @IsOptional()
-  notes?: string;
+  method?: EPaymentMethod;
 
   @IsDateString()
   @IsOptional()
-  paid_at?: string;
+  payment_date?: string;
 }

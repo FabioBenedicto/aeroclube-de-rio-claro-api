@@ -1,9 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { JwtService } from '@nestjs/jwt';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from './auth.service';
 
 const mockPrisma = { user: { findUnique: jest.fn() } };
 const mockJwt = { sign: jest.fn().mockReturnValue('mock-token') };

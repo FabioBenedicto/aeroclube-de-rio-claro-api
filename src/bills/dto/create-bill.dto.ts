@@ -1,43 +1,34 @@
+import { Type } from 'class-transformer';
 import {
-  IsInt,
+  ArrayNotEmpty,
   IsArray,
-  ArrayMinSize,
-  IsDateString,
-  IsOptional,
-  IsString,
-  ValidateNested,
+  IsDate,
+  IsInt,
   IsNumber,
   Min,
+  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
-export class PaymentItemDto {
+export class BillItemDto {
   @IsInt()
-  @Type(() => Number)
   receivable_id: number;
 
   @IsNumber()
   @Min(0.01)
-  @Type(() => Number)
   amount: number;
 }
 
 export class CreateBillDto {
   @IsInt()
-  @Type(() => Number)
-  customer_id: number;
+  people_id: number;
 
   @IsArray()
-  @ArrayMinSize(1)
+  @ArrayNotEmpty()
   @ValidateNested({ each: true })
-  @Type(() => PaymentItemDto)
-  items: PaymentItemDto[];
+  @Type(() => BillItemDto)
+  items: BillItemDto[];
 
-  @IsDateString()
-  @IsOptional()
-  due_date?: string;
-
-  @IsString()
-  @IsOptional()
-  payment_method?: string;
+  @IsDate()
+  @Type(() => Date)
+  expiration_date: Date;
 }

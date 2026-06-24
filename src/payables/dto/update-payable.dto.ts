@@ -1,3 +1,4 @@
+import { EStakeholder } from '@common/enums/stakeholder.enum';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
@@ -7,12 +8,10 @@ import {
   IsString,
 } from 'class-validator';
 
-import { Stakeholder } from '../../shared/enums/stakeholder.enum';
-
 export class UpdatePayableDto {
-  @IsEnum(Stakeholder)
+  @IsEnum(EStakeholder)
   @IsOptional()
-  stakeholder?: Stakeholder;
+  stakeholder?: EStakeholder;
 
   @IsInt()
   @IsOptional()

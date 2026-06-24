@@ -1,0 +1,31 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: craerocluberioclaro.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build e Push
+        run: |
+          docker build -t craerocluberioclaro.azurecr.io/aeroclube-api:latest .
+          docker push craerocluberioclaro.azurecr.io/aeroclube-api:latest
+
+      - name: Deploy no App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: app-aeroclube-rio-claro
+          images: craerocluberioclaro.azurecr.io/aeroclube-api:latest
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}

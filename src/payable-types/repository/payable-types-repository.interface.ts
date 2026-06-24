@@ -1,5 +1,7 @@
 import { PayableType } from '../model/payable-type.model';
 
+export const PAYABLE_TYPES_REPOSITORY = Symbol('IPayableTypesRepository');
+
 export interface IPayableTypesRepository {
   findAll(): Promise<PayableType[]>;
   findById(id: number): Promise<PayableType | null>;

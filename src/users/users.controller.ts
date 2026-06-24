@@ -1,13 +1,30 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { FindAllUsersDto } from './dto/find-all-users.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { ERoles } from './enums/roles.enum';
+import { User } from './model/user.model';
+import { UsersService } from './users.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -16,49 +33,53 @@ import { UpdateMeDto } from './dto/update-me.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Patch('me')
-  @ApiOperation({ summary: 'Update own profile' })
-  updateMe(@Request() req: any, @Body() dto: UpdateMeDto) {
-    return this.usersService.updateMe(req.user.id, dto);
-  }
-
-  @Delete('me')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete own account' })
-  removeSelf(@Request() req: any) {
-    return this.usersService.removeSelf(req.user.id);
-  }
-
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(ERoles.ADMIN)
   @ApiOperation({ summary: 'List all users' })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() query: FindAllUsersDto) {
+    return this.usersService.findAll(query);
   }
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(ERoles.ADMIN)
   @ApiOperation({ summary: 'Create user' })
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
+  @Patch('me')
+  @ApiOperation({ summary: 'Update own profile' })
+  updateMe(@CurrentUser() user: User, @Body() dto: UpdateMeDto) {
+    return this.usersService.updateMe(user.id, dto);
+  }
+
+  @Delete('me')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete own account' })
+  deleteMe(@CurrentUser() user: User) {
+    return this.usersService.removeSelf(user.id);
+  }
+
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(ERoles.ADMIN)
   @ApiOperation({ summary: 'Update user' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @Request() req: any) {
-    return this.usersService.update(id, dto, req.user.id);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.usersService.update(id, dto, user.id);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Remove user' })
-  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.usersService.remove(id, req.user.id);
+  @Roles(ERoles.ADMIN)
+  @ApiOperation({ summary: 'Delete user' })
+  delete(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
+    return this.usersService.delete(id, user.id);
   }
 }

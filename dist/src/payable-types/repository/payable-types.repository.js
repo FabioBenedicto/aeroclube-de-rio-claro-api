@@ -1,0 +1,47 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PayableTypesRepository = void 0;
+const common_1 = require("@nestjs/common");
+const prisma_service_1 = require("../../prisma/prisma.service");
+let PayableTypesRepository = class PayableTypesRepository {
+    prisma;
+    constructor(prisma) {
+        this.prisma = prisma;
+    }
+    findAll() {
+        return this.prisma.payableType.findMany({ orderBy: { name: 'asc' } });
+    }
+    findById(id) {
+        return this.prisma.payableType.findUnique({ where: { id } });
+    }
+    findByName(name) {
+        return this.prisma.payableType.findUnique({ where: { name } });
+    }
+    create(name) {
+        return this.prisma.payableType.create({ data: { name } });
+    }
+    update(id, name) {
+        return this.prisma.payableType.update({ where: { id }, data: { name } });
+    }
+    async delete(id) {
+        await this.prisma.payableType.delete({ where: { id } });
+    }
+    countUsages(id) {
+        return this.prisma.payable.count({ where: { payable_type_id: id } });
+    }
+};
+exports.PayableTypesRepository = PayableTypesRepository;
+exports.PayableTypesRepository = PayableTypesRepository = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+], PayableTypesRepository);
+//# sourceMappingURL=payable-types.repository.js.map

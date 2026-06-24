@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
-import { PERM } from '../common/constants/permissions';
+import { PERMISSIONS } from '../common/constants/permissions';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -29,19 +29,19 @@ export class ReceivableTypesController {
   constructor(private readonly service: ReceivableTypesService) {}
 
   @Get()
-  @RequirePermission(PERM.TITLE_TYPES.VIEW)
+  @RequirePermission(PERMISSIONS.TITLE_TYPES.VIEW)
   findAll() {
     return this.service.findAll();
   }
 
   @Post()
-  @RequirePermission(PERM.TITLE_TYPES.CREATE)
+  @RequirePermission(PERMISSIONS.TITLE_TYPES.CREATE)
   create(@Body() dto: CreateReceivableTypeDto) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @RequirePermission(PERM.TITLE_TYPES.UPDATE)
+  @RequirePermission(PERMISSIONS.TITLE_TYPES.UPDATE)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateReceivableTypeDto,
@@ -50,7 +50,7 @@ export class ReceivableTypesController {
   }
 
   @Delete(':id')
-  @RequirePermission(PERM.TITLE_TYPES.DELETE)
+  @RequirePermission(PERMISSIONS.TITLE_TYPES.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.service.delete(id);

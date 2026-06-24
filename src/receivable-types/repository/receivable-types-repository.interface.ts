@@ -1,5 +1,7 @@
 import { ReceivableType } from '../model/receivable-type.model';
 
+export const RECEIVABLE_TYPES_REPOSITORY = Symbol('IReceivableTypesRepository');
+
 export interface IReceivableTypesRepository {
   findAll(): Promise<ReceivableType[]>;
   findById(id: number): Promise<ReceivableType | null>;

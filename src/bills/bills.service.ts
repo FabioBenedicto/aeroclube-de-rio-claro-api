@@ -1,45 +1,82 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { BillsRepository } from './bills.repository';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CreateFileData } from 'src/file/interfaces/create-file-data';
+
 import { CreateBillDto } from './dto/create-bill.dto';
+import { FindAllBillsDto } from './dto/find-all-bills.dto';
+import { PayBillDto } from './dto/pay-bill.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
+import { EBillStatus } from './enums/bill-status.enum';
+import {
+  BILLS_REPOSITORY,
+  IBillsRepository,
+} from './repository/bills-repository.interface';
 
 @Injectable()
 export class BillsService {
-  constructor(private readonly repo: BillsRepository) {}
+  constructor(
+    @Inject(BILLS_REPOSITORY)
+    private readonly billsRepository: IBillsRepository,
+  ) {}
 
-  async findAll(customerId?: number, dateFrom?: Date, dateTo?: Date, page = 1, limit = 20, pending = false, dueFrom?: Date, dueTo?: Date) {
-    const { data, total } = await this.repo.findAll(customerId, dateFrom, dateTo, page, limit, pending, dueFrom, dueTo);
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  findAll(dto: FindAllBillsDto) {
+    return this.billsRepository.findAll(dto);
   }
 
   async findOne(id: number) {
-    const bill = await this.repo.findById(id);
-    if (!bill) throw new NotFoundException(`Bill ${id} not found`);
+    const bill = await this.billsRepository.findById(id);
+
+    if (!bill) throw new NotFoundException(`Boleto ${id} não encontrado`);
+
     return bill;
   }
 
   create(dto: CreateBillDto) {
-    return this.repo.create(dto);
+    return this.billsRepository.create(dto);
   }
 
   async update(id: number, dto: UpdateBillDto) {
     await this.findOne(id);
-    return this.repo.update(id, {
-      due_date: dto.due_date ? new Date(dto.due_date) : undefined,
+    return this.billsRepository.update(id, dto);
+  }
+
+  async pay(id: number, dto: PayBillDto) {
+    const bill = await this.findOne(id);
+
+    if (bill.status !== EBillStatus.OPEN && bill.status !== EBillStatus.PENDING_CNAB) {
+      throw new ConflictException(
+        `Não é possível pagar um boleto com status "${bill.status}"`,
+      );
+    }
+
+    return this.billsRepository.pay(id, {
+      status: EBillStatus.PAID,
+      payment_method: dto.payment_method,
+      payment_date: dto.payment_date,
+      use_credit: dto.use_credit,
     });
   }
 
   async delete(id: number) {
     await this.findOne(id);
-    return this.repo.delete(id);
+    return this.billsRepository.delete(id);
   }
 
-  async setNotaFiscal(id: number, path: string | null) {
+  async attachInvoice(id: number, fileData: CreateFileData) {
     await this.findOne(id);
-    return this.repo.setNotaFiscal(id, path);
+    return this.billsRepository.attachInvoice(id, fileData);
   }
 
-  createBoleto(dto: import('./dto/create-boleto-bill.dto').CreateBoletoBillDto) {
-    return this.repo.createBoleto(dto);
+  async deleteInvoice(id: number) {
+    await this.findOne(id);
+    return this.billsRepository.deleteInvoice(id);
+  }
+
+  bulkDelete(ids: number[]) {
+    return this.billsRepository.bulkDelete(ids);
   }
 }

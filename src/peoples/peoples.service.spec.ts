@@ -1,88 +1,118 @@
+import { faker } from '@faker-js/faker';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+
 import { PeoplesService } from './peoples.service';
-import { PeoplesRepository } from './peoples.repository';
+import { FakePeoplesRepository } from './repository/peoples/fake-peoples.repository';
+import { PEOPLES_REPOSITORY } from './repository/peoples/peoples-repository.interface';
 
-const mockRepo = () => ({
-  findAll:     jest.fn(),
-  findById:    jest.fn(),
-  findByCpf:   jest.fn(),
-  findByEmail: jest.fn(),
-  create:      jest.fn(),
-  update:      jest.fn(),
-  delete:      jest.fn(),
-  getStats:    jest.fn(),
+const makePeople = (overrides: Record<string, unknown> = {}) => ({
+  id: faker.number.int(),
+  name: faker.person.fullName(),
+  cpf: faker.string.numeric(11),
+  email: faker.internet.email(),
+  phone_number: null,
+  credit_balance: null,
+  address: null,
+  neighborhood: null,
+  city: null,
+  state: null,
+  zip_code: null,
+  created_at: new Date(),
+  updated_at: new Date(),
+  studentId: 0,
+  instructors: null,
+  students: null,
+  partners: null,
+  employees: null,
+  ...overrides,
 });
-
-const basePerson = {
-  id: 1, name: 'Alice', cpf: '123', email: 'a@b.com',
-  instructors: [], students: [], partners: [], employees: [],
-};
 
 describe('PeoplesService', () => {
   let service: PeoplesService;
-  let repo: ReturnType<typeof mockRepo>;
+  let repo: FakePeoplesRepository;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PeoplesService,
-        { provide: PeoplesRepository, useFactory: mockRepo },
+        {
+          provide: PEOPLES_REPOSITORY,
+          useClass: FakePeoplesRepository,
+        },
       ],
     }).compile();
 
     service = module.get(PeoplesService);
-    repo    = module.get(PeoplesRepository);
+    repo = module.get<FakePeoplesRepository>(PEOPLES_REPOSITORY);
+    repo.peoples = [];
   });
 
   describe('findOne', () => {
     it('returns person with categories when found', async () => {
-      repo.findById.mockResolvedValue({ ...basePerson, instructors: [{ id: 10 }] });
+      const people = makePeople({
+        id: 1,
+        instructors: { id: faker.number.int(), people_id: 1 },
+      });
+      repo.peoples = [people];
       const result = await service.findOne(1);
       expect(result.categories).toEqual(['instructor']);
     });
 
     it('throws NotFoundException when not found', async () => {
-      repo.findById.mockResolvedValue(null);
-      await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.findOne(faker.number.int({ min: 100 })),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('create', () => {
     it('creates a person when CPF and email are unique', async () => {
-      repo.findByCpf.mockResolvedValue(null);
-      repo.findByEmail.mockResolvedValue(null);
-      repo.create.mockResolvedValue(basePerson);
-      const result = await service.create({ cpf: '123', name: 'Alice', email: 'a@b.com' } as any);
+      const result = await service.create({
+        cpf: faker.string.numeric(11),
+        name: faker.person.fullName(),
+        email: faker.internet.email(),
+      });
       expect(result.categories).toEqual([]);
-      expect(repo.create).toHaveBeenCalledTimes(1);
+      expect(repo.peoples).toHaveLength(1);
     });
 
     it('throws ConflictException when CPF is taken', async () => {
-      repo.findByCpf.mockResolvedValue(basePerson);
-      await expect(service.create({ cpf: '123', name: 'Alice', email: 'a@b.com' } as any))
-        .rejects.toThrow(ConflictException);
+      const cpf = faker.string.numeric(11);
+      repo.peoples = [makePeople({ cpf })];
+      await expect(
+        service.create({
+          cpf,
+          name: faker.person.fullName(),
+          email: faker.internet.email(),
+        } as any),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('throws ConflictException when email is taken', async () => {
-      repo.findByCpf.mockResolvedValue(null);
-      repo.findByEmail.mockResolvedValue(basePerson);
-      await expect(service.create({ cpf: '999', name: 'Alice', email: 'a@b.com' } as any))
-        .rejects.toThrow(ConflictException);
+      const email = faker.internet.email();
+      repo.peoples = [makePeople({ email })];
+      await expect(
+        service.create({
+          cpf: faker.string.numeric(11),
+          name: faker.person.fullName(),
+          email,
+        } as any),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
   describe('delete', () => {
     it('deletes person when found', async () => {
-      repo.findById.mockResolvedValue(basePerson);
-      repo.delete.mockResolvedValue(basePerson);
+      repo.peoples = [makePeople({ id: 1 })];
       await service.delete(1);
-      expect(repo.delete).toHaveBeenCalledWith(1);
+      expect(repo.peoples).toHaveLength(0);
     });
 
     it('throws NotFoundException when not found', async () => {
-      repo.findById.mockResolvedValue(null);
-      await expect(service.delete(99)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.delete(faker.number.int({ min: 100 })),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

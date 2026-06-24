@@ -11,8 +11,8 @@ import { ReceivableTypesService } from '../receivable-types/receivable-types.ser
 import { CreateFlightDto } from './dto/create-flight.dto';
 import { FindAllFlightsDto } from './dto/find-all-flights.dto';
 import { UpdateFlightDto } from './dto/update-flight.dto';
-import { FlightsRepository } from './repository/flights.repository';
 import {
+  FLIGHTS_REPOSITORY,
   FlightSettings,
   IFlightsRepository,
   PlaneSummary,
@@ -21,7 +21,7 @@ import {
 @Injectable()
 export class FlightsService {
   constructor(
-    @Inject(FlightsRepository)
+    @Inject(FLIGHTS_REPOSITORY)
     private readonly flightsRepository: IFlightsRepository,
     private readonly receivableTypesService: ReceivableTypesService,
     private readonly payableTypesService: PayableTypesService,
@@ -117,8 +117,10 @@ export class FlightsService {
     expirationDate.setDate(expirationDate.getDate() + 30);
 
     const [flightType, instructionType] = await Promise.all([
-      this.receivableTypesService.findByName('FLIGHT'),
-      this.payableTypesService.findByName('INSTRUCTION'),
+      this.receivableTypesService.findById(dto.receivable_type_id),
+      dto.instructor_id && dto.payable_type_id
+        ? this.payableTypesService.findById(dto.payable_type_id)
+        : Promise.resolve(null),
     ]);
 
     return this.flightsRepository.registerFlight({
@@ -136,9 +138,8 @@ export class FlightsService {
       buildReceivable: totalAmount
         ? (flightId) => ({
             peopleId: dto.people_id,
-            aircraftId: dto.aircraft_id,
-            instructorId: dto.instructor_id,
             title: dto.receivable_title ?? `Flight ${flightId}`,
+            description: dto.receivable_description,
             expirationDate: dto.receivable_expiration_date
               ? new Date(dto.receivable_expiration_date)
               : expirationDate,
@@ -148,10 +149,11 @@ export class FlightsService {
           })
         : undefined,
       buildPayable:
-        dto.instructor_id && instructorAmount !== undefined
+        dto.instructor_id && instructorAmount !== undefined && instructionType
           ? (flightId) => ({
               instructorId: dto.instructor_id!,
               title: dto.payable_title ?? `Instruction ${flightId}`,
+              description: dto.payable_description,
               amount: instructorAmount.toNumber(),
               payable_type_id: instructionType.id,
               dueDate: dto.payable_due_date
@@ -164,6 +166,10 @@ export class FlightsService {
 
   findAll(dto: FindAllFlightsDto) {
     return this.flightsRepository.findAll(dto);
+  }
+
+  getStats(dto: FindAllFlightsDto) {
+    return this.flightsRepository.getStats(dto);
   }
 
   async findOne(id: number) {
@@ -209,38 +215,25 @@ export class FlightsService {
 
     const hasReceivable = (flight.receivables?.length ?? 0) > 0;
 
-    const [flightType, instructionType] = await Promise.all([
-      this.receivableTypesService.findByName('FLIGHT'),
-      this.payableTypesService.findByName('INSTRUCTION'),
-    ]);
+    const existingReceivable = flight.receivables?.[0];
 
     return this.flightsRepository.closeFlight(id, {
       endDate,
       totalHours: totalHours.toNumber(),
       totalAmount: totalAmount.toNumber(),
       breakdown,
-      buildReceivable: !hasReceivable
-        ? () => ({
-            peopleId: flight.people_id,
-            aircraftId: flight.aircraft_id,
-            instructorId: flight.instructor_id ?? undefined,
-            title: `Flight ${id}`,
-            expirationDate,
-            totalAmount: totalAmount.toNumber(),
-            receivable_type_id: flightType.id,
-            stakeholder: 'PEOPLE',
-          })
-        : undefined,
-      buildPayable:
-        flight.instructor_id && instructorAmount.greaterThan(0)
+      buildReceivable:
+        !hasReceivable && existingReceivable?.receivable_type_id
           ? () => ({
-              instructorId: flight.instructor_id!,
-              title: `Instruction ${id}`,
-              amount: instructorAmount.toNumber(),
-              payable_type_id: instructionType.id,
-              dueDate: expirationDate,
+              peopleId: flight.people_id,
+              title: `Flight ${id}`,
+              expirationDate,
+              totalAmount: totalAmount.toNumber(),
+              receivable_type_id: existingReceivable.receivable_type_id,
+              stakeholder: 'PEOPLE',
             })
           : undefined,
+      buildPayable: undefined,
     });
   }
 
@@ -297,12 +290,6 @@ export class FlightsService {
       }
     }
 
-    let instructionPayableTypeId: number | undefined;
-    if (effectiveInstructorId && newInstructorPayableAmount !== undefined) {
-      const instructionType = await this.payableTypesService.findByName('INSTRUCTION');
-      instructionPayableTypeId = instructionType.id;
-    }
-
     return this.flightsRepository.updateFlightAndRelations(id, {
       type: dto.type,
       origin: dto.origin,
@@ -318,7 +305,6 @@ export class FlightsService {
       newInstructorPayableAmount: effectiveInstructorId
         ? newInstructorPayableAmount
         : undefined,
-      instructionPayableTypeId,
     });
   }
 
@@ -330,5 +316,9 @@ export class FlightsService {
       );
     }
     return this.flightsRepository.delete(id);
+  }
+
+  bulkRemove(ids: number[]) {
+    return this.flightsRepository.bulkDelete(ids);
   }
 }

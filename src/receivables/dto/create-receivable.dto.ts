@@ -1,5 +1,8 @@
+import { ERecurrence } from '@common/enums/recurrence.enum';
+import { EStakeholder } from '@common/enums/stakeholder.enum';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDate,
   IsEnum,
   IsInt,
@@ -11,13 +14,10 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-import { Recurrence } from '../../shared/enums/recurrence.enum';
-import { Stakeholder } from '../../shared/enums/stakeholder.enum';
-
 export class CreateReceivableDto {
-  @IsEnum(Stakeholder)
+  @IsEnum(EStakeholder)
   @IsOptional()
-  stakeholder?: Stakeholder;
+  stakeholder?: EStakeholder;
 
   @IsInt()
   @IsOptional()
@@ -72,11 +72,16 @@ export class CreateReceivableDto {
   expiration_date: Date;
 
   @IsInt()
-  receivable_type_id: number;
-
-  @IsEnum(Recurrence)
   @IsOptional()
-  recurrence?: Recurrence;
+  receivable_type_id?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  adds_credit?: boolean;
+
+  @IsEnum(ERecurrence)
+  @IsOptional()
+  recurrence?: ERecurrence;
 
   @IsInt()
   @Min(2)

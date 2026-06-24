@@ -1,3 +1,4 @@
+import { IsCNPJ } from '@common/decorators/is-cnpj.decorator';
 import { Type } from 'class-transformer';
 import {
   IsInt,
@@ -8,8 +9,6 @@ import {
   Max,
   Min,
 } from 'class-validator';
-
-import { IsCnpj } from '@common/validators';
 
 export class UpsertSicoobSettingsDto {
   @IsString()
@@ -47,7 +46,7 @@ export class UpsertSicoobSettingsDto {
   @Matches(/^\d{2}$/, { message: 'modality must have 2 digits' })
   modality?: string;
 
-  @IsCnpj()
+  @IsCNPJ()
   @IsOptional()
   cnpj?: string;
 

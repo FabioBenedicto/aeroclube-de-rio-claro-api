@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -8,7 +9,7 @@ datasource db {
 
 enum Role {
   ADMIN
-  EMPLOYEE
+  USER
 }
 
 enum BillStatus {
@@ -19,9 +20,10 @@ enum BillStatus {
 }
 
 enum TitleStatus {
-  OPEN
+  PENDING
   PARTIAL
   PAID
+  OVERDUE
 }
 
 enum TitleStakeholder {
@@ -82,12 +84,23 @@ model SicoobSettings {
   @@map("sicoob_config")
 }
 
+model Permission {
+  id           Int    @id @default(autoincrement())
+  key          String @unique @db.VarChar(60)
+  module       String @db.VarChar(30)
+  module_label String @db.VarChar(60)
+  action       String @db.VarChar(20)
+  action_label String @db.VarChar(30)
+
+  @@map("permissions")
+}
+
 model User {
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(100)
   email      String   @unique @db.VarChar(100)
   password   String
-  role       Role     @default(EMPLOYEE)
+  role       Role     @default(USER)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -113,7 +126,6 @@ model People {
   name                String   @db.VarChar(100)
   email               String   @unique @db.VarChar(100)
   phone_number        String?  @db.VarChar(20)
-  flight_hour_balance Int      @default(0)
   credit_balance      Decimal  @default(0) @db.Decimal(10, 2)
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
@@ -207,9 +219,9 @@ model Employee {
 model Company {
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(100)
-  cnpj       String?  @unique @db.VarChar(18)
-  email      String?  @db.VarChar(100)
-  phone      String?  @db.VarChar(20)
+  cnpj       String   @unique @db.VarChar(18)
+  email      String   @unique @db.VarChar(100)
+  phone      String   @db.VarChar(20)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -223,7 +235,7 @@ model Aircraft {
   id                Int      @id @default(autoincrement())
   registration      String   @unique @db.VarChar(10)
   model             String   @db.VarChar()
-  type              String   @default("airplane") @db.VarChar(10)
+  type              String   @default("AIRPLANE") @db.VarChar(10)
   flight_hour_value Decimal? @db.Decimal(10, 2)
   created_at        DateTime @default(now())
   updated_at        DateTime @default(now()) @updatedAt()
@@ -269,11 +281,13 @@ model Receivable {
   expiration_date DateTime         @db.Date
   total_amount    Decimal          @db.Decimal(10, 2)
   amount_received Decimal          @default(0) @db.Decimal(10, 2)
-  receivable_type_id Int
-  receivable_type    ReceivableType @relation(fields: [receivable_type_id], references: [id])
-  status          TitleStatus      @default(OPEN)
+  adds_credit     Boolean          @default(false)
+  status          TitleStatus      @default(PENDING)
   created_at      DateTime         @default(now()) @db.Timestamptz(6)
   updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+
+  receivable_type_id Int?
+  receivable_type    ReceivableType? @relation(fields: [receivable_type_id], references: [id])
 
   people_id Int?
   people    People? @relation(fields: [people_id], references: [id])
@@ -305,10 +319,10 @@ model Receivable {
 }
 
 model ReceivablePayment {
-  id           Int      @id @default(autoincrement())
-  amount       Decimal  @db.Decimal(10, 2)
-  method       String?  @db.VarChar(30)
-  payment_date DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  amount       Decimal   @db.Decimal(10, 2)
+  method       String?   @db.VarChar(30)
+  payment_date DateTime?
 
   receivable_id Int
   receivable    Receivable @relation(fields: [receivable_id], references: [id], onDelete: Cascade)
@@ -329,12 +343,13 @@ model Payable {
   description     String?
   total_amount    Decimal          @db.Decimal(10, 2)
   amount_paid     Decimal          @default(0) @db.Decimal(10, 2)
-  status          TitleStatus      @default(OPEN)
-  expiration_date DateTime?        @db.Date
-  payable_type_id Int?
-  payable_type    PayableType?     @relation(fields: [payable_type_id], references: [id])
+  status          TitleStatus      @default(PENDING)
+  expiration_date DateTime         @db.Date
   created_at      DateTime         @default(now()) @db.Timestamptz(6)
   updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+
+  payable_type_id Int?
+  payable_type    PayableType? @relation(fields: [payable_type_id], references: [id])
 
   people_id Int?
   people    People? @relation(fields: [people_id], references: [id])

@@ -1,0 +1,8 @@
+export enum ETitleStakeholder {
+  PEOPLE = 'PEOPLE',
+  STUDENT = 'STUDENT',
+  PARTNER = 'PARTNER',
+  INSTRUCTOR = 'INSTRUCTOR',
+  EMPLOYEE = 'EMPLOYEE',
+  NONE = 'NONE',
+}

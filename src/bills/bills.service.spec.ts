@@ -1,21 +1,24 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BillsService } from './bills.service';
-import { BillsRepository } from './bills.repository';
 
-describe('BillsService.createBoleto', () => {
+import { BillsService } from './bills.service';
+import { BILLS_REPOSITORY } from './repository/bills-repository.interface';
+import { FakeBillsRepository } from './repository/fake-bills.repository';
+
+describe('BillsService', () => {
   let service: BillsService;
-  let repo: jest.Mocked<BillsRepository>;
+  let repo: FakeBillsRepository;
 
   const mockBill = {
     id: 1,
-    customer_id: 10,
-    total_amount: { toString: () => '150.00' },
-    due_date: new Date('2026-06-30'),
-    paid_at: null,
-    issue_date: new Date(),
-    nota_fiscal_path: null,
+    people_id: 10,
+    total_amount: 150,
+    expiration_date: new Date('2026-06-30'),
+    payment_date: null,
     created_at: new Date(),
-    customer: { id: 10, name: 'JOAO SILVA', cpf: '12345678900' },
+    file: null,
+    file_id: null,
+    People: { id: 10, name: 'JOAO SILVA', cpf: '12345678900' },
     receivable_payments: [],
   };
 
@@ -23,28 +26,29 @@ describe('BillsService.createBoleto', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillsService,
-        {
-          provide: BillsRepository,
-          useValue: {
-            findById: jest.fn(),
-            createBoleto: jest.fn(),
-            create: jest.fn(),
-            findAll: jest.fn(),
-            update: jest.fn(),
-            delete: jest.fn(),
-            setNotaFiscal: jest.fn(),
-          },
-        },
+        { provide: BILLS_REPOSITORY, useClass: FakeBillsRepository },
       ],
     }).compile();
     service = module.get(BillsService);
-    repo = module.get(BillsRepository);
+    repo = module.get<FakeBillsRepository>(BILLS_REPOSITORY);
+    repo.bills = [];
   });
 
-  it('calls repo.createBoleto and returns result with paid_at null', async () => {
-    repo.createBoleto.mockResolvedValue(mockBill as any);
-    const result = await service.createBoleto({ customer_id: 10, total_amount: 150, due_date: '2026-06-30' });
-    expect(repo.createBoleto).toHaveBeenCalledWith({ customer_id: 10, total_amount: 150, due_date: '2026-06-30' });
-    expect(result.paid_at).toBeNull();
+  describe('findOne', () => {
+    it('returns bill when found', async () => {
+      repo.bills = [mockBill];
+      const result = await service.findOne(1);
+      expect(result).toMatchObject({ id: 1 });
+    });
+
+    it('throws NotFoundException when not found', async () => {
+      await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('delete', () => {
+    it('throws NotFoundException when bill not found', async () => {
+      await expect(service.delete(99)).rejects.toThrow(NotFoundException);
+    });
   });
 });

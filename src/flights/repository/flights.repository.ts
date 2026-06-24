@@ -1,17 +1,19 @@
-import { Injectable } from '@nestjs/common';
-import { Flight as PrismaFlight, Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { endOfDay } from 'date-fns';
+import { Flight as PrismaFlight, Prisma } from 'src/generated/prisma/client';
 
-import { normalizePlane } from '../../aircraft/repository/aircraft.repository';
-import { paginate } from '../../common/dto/pagination.dto';
-import { People } from '../../peoples/model/people.model';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FindAllFlightsDto } from '../dto/find-all-flights.dto';
 import { Flight } from '../model/flight.model';
 import {
   CloseFlightData,
   FlightSettings,
+  FlightStats,
   IFlightsRepository,
   PlaneSummary,
   RegisterFlightData,
@@ -42,60 +44,16 @@ type FlightNested = Prisma.FlightGetPayload<{
 }>;
 
 export function normalizeFlight(f: FlightNested) {
-  return {
-    ...f,
-    total_hours: f.total_hours !== null ? Number(f.total_hours) : null,
-    total_amount: f.total_amount !== null ? Number(f.total_amount) : null,
-    aircraft: f.aircraft ? normalizePlane(f.aircraft) : f.aircraft,
-    people: f.people ? plainToInstance(People, f.people) : f.people,
-  };
+  return plainToInstance(Flight, f);
 }
 
 function toFlight(raw: FlightRaw): Flight {
-  return plainToInstance(Flight, {
-    ...raw,
-    total_hours: raw.total_hours !== null ? Number(raw.total_hours) : null,
-    total_amount: raw.total_amount !== null ? Number(raw.total_amount) : null,
-    aircraft: raw.aircraft
-      ? {
-          ...raw.aircraft,
-          flight_hour_value:
-            raw.aircraft.flight_hour_value !== null
-              ? Number(raw.aircraft.flight_hour_value)
-              : null,
-        }
-      : null,
-    people: raw.people ? plainToInstance(People, raw.people) : null,
-    instructor: raw.instructor
-      ? {
-          ...raw.instructor,
-          people: plainToInstance(People, raw.instructor.people),
-        }
-      : null,
-  });
+  return plainToInstance(Flight, raw);
 }
 
 function toFlightDetail(raw: FlightDetailRaw): Flight {
   return plainToInstance(Flight, {
     ...raw,
-    total_hours: raw.total_hours !== null ? Number(raw.total_hours) : null,
-    total_amount: raw.total_amount !== null ? Number(raw.total_amount) : null,
-    aircraft: raw.aircraft
-      ? {
-          ...raw.aircraft,
-          flight_hour_value:
-            raw.aircraft.flight_hour_value !== null
-              ? Number(raw.aircraft.flight_hour_value)
-              : null,
-        }
-      : null,
-    people: raw.people ? plainToInstance(People, raw.people) : null,
-    instructor: raw.instructor
-      ? {
-          ...raw.instructor,
-          people: plainToInstance(People, raw.instructor.people),
-        }
-      : null,
     receivables: raw.receivables.map((r) => ({
       ...r,
       total_amount: Number(r.total_amount),
@@ -105,11 +63,7 @@ function toFlightDetail(raw: FlightDetailRaw): Flight {
 }
 
 function toBaseFlightOnly(raw: PrismaFlight): Flight {
-  return plainToInstance(Flight, {
-    ...raw,
-    total_hours: raw.total_hours !== null ? Number(raw.total_hours) : null,
-    total_amount: raw.total_amount !== null ? Number(raw.total_amount) : null,
-  });
+  return plainToInstance(Flight, raw);
 }
 
 @Injectable()
@@ -149,11 +103,8 @@ export class FlightsRepository implements IFlightsRepository {
           data: {
             people: { connect: { id: r.peopleId } },
             flight: { connect: { id: flight.id } },
-            aircraft: { connect: { id: r.aircraftId } },
-            ...(r.instructorId && {
-              instructor: { connect: { id: r.instructorId } },
-            }),
             title: r.title,
+            ...(r.description && { description: r.description }),
             expiration_date: r.expirationDate,
             total_amount: r.totalAmount,
             receivable_type: { connect: { id: r.receivable_type_id } },
@@ -169,6 +120,7 @@ export class FlightsRepository implements IFlightsRepository {
           data: {
             instructor: { connect: { id: p.instructorId } },
             title: p.title,
+            ...(p.description && { description: p.description }),
             total_amount: p.amount,
             payable_type: { connect: { id: p.payable_type_id } },
             expiration_date: p.dueDate,
@@ -211,27 +163,31 @@ export class FlightsRepository implements IFlightsRepository {
     };
   }
 
-  async findAll({
+  private buildWhere({
     aircraft_id,
     people_id,
     instructor_id,
+    student_id,
+    partner_id,
     type,
     date_from,
     date_to,
-    page = 1,
-    limit = 20,
     search,
-  }: FindAllFlightsDto) {
+  }: FindAllFlightsDto): Prisma.FlightWhereInput {
     const AND: Prisma.FlightWhereInput[] = [];
     if (aircraft_id) AND.push({ aircraft_id });
     if (people_id) AND.push({ people_id });
     if (instructor_id) AND.push({ instructor_id });
+    if (student_id) AND.push({ people: { students: { id: student_id } } });
+    if (partner_id) AND.push({ people: { partners: { id: partner_id } } });
     if (type) AND.push({ type: { contains: type, mode: 'insensitive' } });
     if (search) {
       AND.push({
         OR: [
           {
-            aircraft: { registration: { contains: search, mode: 'insensitive' } },
+            aircraft: {
+              registration: { contains: search, mode: 'insensitive' },
+            },
           },
           { people: { name: { contains: search, mode: 'insensitive' } } },
         ],
@@ -245,8 +201,12 @@ export class FlightsRepository implements IFlightsRepository {
         },
       });
     }
+    return AND.length > 0 ? { AND } : {};
+  }
 
-    const where: Prisma.FlightWhereInput = AND.length > 0 ? { AND } : {};
+  async findAll(dto: FindAllFlightsDto) {
+    const { page = 1, limit = 20 } = dto;
+    const where = this.buildWhere(dto);
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.flight.findMany({
@@ -259,7 +219,35 @@ export class FlightsRepository implements IFlightsRepository {
       this.prisma.flight.count({ where }),
     ]);
 
-    return paginate(data.map(toFlight), total, page, limit);
+    return {
+      data: data.map(toFlight),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getStats(dto: FindAllFlightsDto): Promise<FlightStats> {
+    const where = this.buildWhere(dto);
+    const [total, aggregate] = await this.prisma.$transaction([
+      this.prisma.flight.count({ where }),
+      this.prisma.flight.aggregate({
+        where,
+        _sum: { total_hours: true, total_amount: true },
+      }),
+    ]);
+    return {
+      total,
+      total_hours:
+        aggregate._sum.total_hours != null
+          ? Number(aggregate._sum.total_hours)
+          : null,
+      total_revenue:
+        aggregate._sum.total_amount != null
+          ? Number(aggregate._sum.total_amount)
+          : null,
+    };
   }
 
   async findById(id: number) {
@@ -305,20 +293,33 @@ export class FlightsRepository implements IFlightsRepository {
         include: flightInclude,
       });
 
-      if (data.totalAmount !== undefined) {
+      if (data.totalAmount !== undefined || data.peopleId !== undefined) {
         await tx.receivable.updateMany({
           where: { flight_id: id },
-          data: { total_amount: data.totalAmount },
+          data: {
+            ...(data.totalAmount !== undefined && {
+              total_amount: data.totalAmount,
+            }),
+            ...(data.peopleId !== undefined && { people_id: data.peopleId }),
+          },
         });
       }
 
-      if (data.newInstructorPayableAmount !== undefined && data.instructionPayableTypeId) {
+      if (
+        data.newInstructorPayableAmount !== undefined ||
+        (data.instructorId !== undefined && data.instructorId !== null)
+      ) {
         await tx.payable.updateMany({
-          where: {
-            title: `Instruction ${id}`,
-            payable_type_id: data.instructionPayableTypeId,
+          where: { flight_id: id },
+          data: {
+            ...(data.newInstructorPayableAmount !== undefined && {
+              total_amount: data.newInstructorPayableAmount,
+            }),
+            ...(data.instructorId !== undefined &&
+              data.instructorId !== null && {
+                instructor_id: data.instructorId,
+              }),
           },
-          data: { total_amount: data.newInstructorPayableAmount },
         });
       }
 
@@ -347,10 +348,6 @@ export class FlightsRepository implements IFlightsRepository {
           data: {
             people: { connect: { id: r.peopleId } },
             flight: { connect: { id } },
-            aircraft: { connect: { id: r.aircraftId } },
-            ...(r.instructorId && {
-              instructor: { connect: { id: r.instructorId } },
-            }),
             title: r.title,
             expiration_date: r.expirationDate,
             total_amount: r.totalAmount,
@@ -391,5 +388,26 @@ export class FlightsRepository implements IFlightsRepository {
   async delete(id: number) {
     const raw = await this.prisma.flight.delete({ where: { id } });
     return toBaseFlightOnly(raw);
+  }
+
+  async bulkDelete(ids: number[]): Promise<void> {
+    const count = await this.prisma.flight.count({
+      where: { id: { in: ids } },
+    });
+    if (count !== ids.length)
+      throw new UnprocessableEntityException(
+        'Um ou mais voos não foram encontrados',
+      );
+    const withPayments = await this.prisma.flight.count({
+      where: {
+        id: { in: ids },
+        receivables: { some: { payments: { some: {} } } },
+      },
+    });
+    if (withPayments > 0)
+      throw new BadRequestException(
+        'Não é possível excluir voos com pagamentos registrados no recebível vinculado',
+      );
+    await this.prisma.flight.deleteMany({ where: { id: { in: ids } } });
   }
 }

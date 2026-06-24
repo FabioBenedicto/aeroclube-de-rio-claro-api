@@ -1,13 +1,12 @@
+import { IsCNPJ } from '@common/decorators/is-cnpj.decorator';
 import { IsEmail, IsOptional, IsString } from 'class-validator';
-
-import { IsCnpj } from '@common/validators';
 
 export class UpdateCompanyDto {
   @IsString()
   @IsOptional()
   name?: string;
 
-  @IsCnpj()
+  @IsCNPJ()
   @IsOptional()
   cnpj?: string;
 

@@ -1,57 +1,90 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PayablesRepository } from './payables.repository';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { ETitleStatus } from '@common/enums/title-status.enum';
+import { CreateFileData } from 'src/file/interfaces/create-file-data';
 import { CreatePayableDto } from './dto/create-payable.dto';
-import { UpdatePayableDto } from './dto/update-payable.dto';
 import { CreatePayablePaymentDto } from './dto/create-payable-payment.dto';
+import { FindAllPayablesDto } from './dto/find-all-payables.dto';
+import { UpdatePayableDto } from './dto/update-payable.dto';
+import { PAYABLES_REPOSITORY, IPayablesRepository } from './repository/payables-repository.interface';
 
 @Injectable()
 export class PayablesService {
-  constructor(private readonly repo: PayablesRepository) {}
+  constructor(
+    @Inject(PAYABLES_REPOSITORY)
+    private readonly payablesRepository: IPayablesRepository,
+  ) {}
 
-  async findAll(status?: string, clientId?: number, search?: string, dateFrom?: string, dateTo?: string, page = 1, limit = 20, instructorId?: number, employeeId?: number) {
-    const from = dateFrom ? new Date(dateFrom) : undefined;
-    const to = dateTo ? new Date(dateTo) : undefined;
-    const { data, total } = await this.repo.findAll(status, clientId, search, from, to, page, limit, instructorId, employeeId);
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  findAll(query: FindAllPayablesDto) {
+    return this.payablesRepository.findAll(query);
+  }
+
+  getStats(query: FindAllPayablesDto) {
+    return this.payablesRepository.getStats(query);
   }
 
   async findOne(id: number) {
-    const p = await this.repo.findById(id);
-    if (!p) throw new NotFoundException(`Payable ${id} not found`);
-    return p;
+    const payable = await this.payablesRepository.findById(id);
+
+    if (!payable)
+      throw new NotFoundException(`Título a pagar ${id} não encontrada`);
+
+    return payable;
   }
 
   create(dto: CreatePayableDto) {
-    return this.repo.create(dto);
+    return this.payablesRepository.create(dto);
   }
 
   async update(id: number, dto: UpdatePayableDto) {
     await this.findOne(id);
-    return this.repo.update(id, dto);
-  }
-
-  registerPayment(id: number, dto: CreatePayablePaymentDto) {
-    return this.repo.registerPayment(id, dto);
+    return this.payablesRepository.update(id, dto);
   }
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.repo.delete(id);
-  }
-
-  async deletePayment(paymentId: number) {
-    const payment = await this.repo.deletePayment(paymentId);
-    if (!payment) throw new NotFoundException(`Payment ${paymentId} not found`);
-    return payment;
+    return this.payablesRepository.delete(id);
   }
 
   async getPayment(paymentId: number) {
-    const p = await this.repo.findPaymentById(paymentId);
-    if (!p) throw new NotFoundException(`Payment ${paymentId} not found`);
-    return p;
+    const payment = await this.payablesRepository.findPaymentById(paymentId);
+
+    if (!payment)
+      throw new NotFoundException(`Pagamento ${paymentId} não encontrado`);
+
+    return payment;
   }
 
-  setPaymentNotaFiscal(paymentId: number, path: string | null) {
-    return this.repo.setPaymentNotaFiscal(paymentId, path);
+  async createPayment(id: number, dto: CreatePayablePaymentDto) {
+    const payable = await this.findOne(id);
+
+    if (payable.status === ETitleStatus.PAID)
+      throw new BadRequestException('Conta a pagar já liquidada');
+
+    return this.payablesRepository.createPayment(id, dto);
+  }
+
+  async deletePayment(paymentId: number) {
+    await this.getPayment(paymentId);
+    await this.payablesRepository.deletePayment(paymentId);
+  }
+
+  async addPaymentInvoice(paymentId: number, fileData: CreateFileData) {
+    await this.getPayment(paymentId);
+    return this.payablesRepository.addPaymentInvoice(paymentId, fileData);
+  }
+
+  async deletePaymentInvoice(paymentId: number) {
+    await this.getPayment(paymentId);
+    return this.payablesRepository.deletePaymentInvoice(paymentId);
+  }
+
+  bulkDelete(ids: number[]) {
+    return this.payablesRepository.bulkDelete(ids);
   }
 }

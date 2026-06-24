@@ -1,142 +1,194 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { join } from 'path';
-import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import * as iconv from 'iconv-lite';
-import { CnabRepository } from './cnab.repository';
+
+import {
+  BILLS_REPOSITORY,
+  IBillsRepository,
+} from '../bills/repository/bills-repository.interface';
+import {
+  AZURE_BLOB_SERVICE,
+  IAzureBlobService,
+} from '../common/providers/azure-blob/azure-blob.service.interface';
+import {
+  ISicoobSettingsRepository,
+  SICOOB_SETTINGS_REPOSITORY,
+} from '../settings/repository/sicoob/sicoob-settings-repository.interface';
+import { buildRemessaLines } from './builders/remittent.builder';
 import { GenerateRemessaDto } from './dto/generate-remessa.dto';
-import { buildRemessaLines } from './builders/remessa.builder';
-import { parseRetorno, RetornoResult } from './parsers/retorno.parser';
+import {
+  CNAB_REPOSITORY,
+  ICnabRepository,
+} from './repository/cnab-repository.interface';
 
 @Injectable()
 export class CnabService {
-  constructor(private readonly repo: CnabRepository) {}
+  constructor(
+    @Inject(CNAB_REPOSITORY)
+    private readonly CnabRepository: ICnabRepository,
 
-  async generateRemessa(dto: GenerateRemessaDto) {
-    const settings = await this.repo.getSettings();
+    @Inject(BILLS_REPOSITORY)
+    private readonly billsRepository: IBillsRepository,
+
+    @Inject(SICOOB_SETTINGS_REPOSITORY)
+    private readonly sicoobSettingsRepository: ISicoobSettingsRepository,
+
+    @Inject(AZURE_BLOB_SERVICE)
+    private readonly azureBlobService: IAzureBlobService,
+  ) {}
+
+  listRemittent(page: number, limit: number) {
+    return this.CnabRepository.listRemittent(page, limit);
+  }
+
+  async generateRemittent(dto: GenerateRemessaDto) {
+    const config = await this.sicoobSettingsRepository.find();
 
     if (
-      !settings?.sicoob_cooperativa_prefix ||
-      !settings?.sicoob_cooperativa_dv ||
-      !settings?.sicoob_conta ||
-      !settings?.sicoob_conta_dv ||
-      !settings?.sicoob_cnpj ||
-      !settings?.sicoob_carteira ||
-      !settings?.sicoob_modalidade ||
-      !settings?.sicoob_nome_empresa
+      !config ||
+      !config.cooperative_prefix ||
+      !config.cooperative_digit ||
+      !config.account ||
+      !config.account_digit ||
+      !config.cnpj ||
+      !config.wallet ||
+      !config.modality ||
+      !config.company_name
     ) {
       throw new UnprocessableEntityException(
-        'Sicoob settings are incomplete. Fill them in via PUT /api/settings.',
+        'Configurações do Sicoob incompletas.',
       );
     }
 
-    const bills = await this.repo.findBillsByIds(dto.bill_ids);
-    const invalidBills = bills.filter((b) => !b.due_date);
-    if (invalidBills.length > 0) {
+    const bills = await this.billsRepository.findByIds(dto.bill_ids);
+
+    const missing = dto.bill_ids.filter(
+      (id) => !bills.find((b) => b.id === id),
+    );
+
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        `Boletos não encontrados: ${missing.join(', ')}`,
+      );
+    }
+
+    const withoutAddress = bills.filter((b) => !b.people?.address);
+    if (withoutAddress.length > 0) {
+      const names = withoutAddress
+        .map((b) => b.people?.name ?? `Boleto ${b.id}`)
+        .join(', ');
       throw new UnprocessableEntityException(
-        `Bills without a due date: ${invalidBills.map((b) => b.id).join(', ')}`,
+        `Os seguintes clientes não possuem endereço cadastrado: ${names}`,
       );
     }
 
-    const seqNumber = settings.sicoob_remessa_sequence;
+    const sequenceNumber = config.remittance_sequence;
+
     const now = new Date();
 
     const lines = buildRemessaLines(
       {
-        sicoob_cooperativa_prefix: settings.sicoob_cooperativa_prefix,
-        sicoob_cooperativa_dv: settings.sicoob_cooperativa_dv,
-        sicoob_conta: settings.sicoob_conta,
-        sicoob_conta_dv: settings.sicoob_conta_dv,
-        sicoob_carteira: settings.sicoob_carteira,
-        sicoob_modalidade: settings.sicoob_modalidade,
-        sicoob_cnpj: settings.sicoob_cnpj,
-        sicoob_nome_empresa: settings.sicoob_nome_empresa,
-        sicoob_remessa_sequence: seqNumber,
-        sicoob_juros: Number(settings.sicoob_juros ?? 0),
-        sicoob_juros_prazo: settings.sicoob_juros_prazo ?? 0,
-        sicoob_juros_tipo: settings.sicoob_juros_tipo ?? '2',
+        cooperative_prefix: config.cooperative_prefix,
+        cooperative_digit: config.cooperative_digit,
+        account: config.account,
+        account_digit: config.account_digit,
+        wallet: config.wallet,
+        modality: config.modality,
+        cnpj: config.cnpj,
+        company_name: config.company_name,
+        remittance_sequence: config.remittance_sequence,
+        interest_rate: config.interest_rate,
+        interest_period: config.interest_period,
+        interest_type: config.interest_type,
       },
-      bills as any,
+      bills,
       now,
     );
+
     const content = lines.join('\r\n') + '\r\n';
     const buffer = iconv.encode(content, 'win1252');
 
     const dd = String(now.getUTCDate()).padStart(2, '0');
     const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
     const yyyy = String(now.getUTCFullYear());
-    const filename = `remessa_${yyyy}${mm}${dd}_${seqNumber}.rem`;
-    const dir = join(process.cwd(), 'uploads', 'cnab');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, filename), buffer);
 
-    const totalAmount = bills.reduce((s, b) => s + parseFloat(String(b.total_amount)), 0);
+    const filename = `remessa_${yyyy}${mm}${dd}_${sequenceNumber}.rem`;
+    const blobPath = `cnab/${filename}`;
 
-    await this.repo.incrementRemessaSequence();
-    await this.repo.markBillsPendingCnab(dto.bill_ids);
+    const url = await this.azureBlobService.upload(
+      blobPath,
+      buffer,
+      'application/octet-stream',
+    );
 
-    return this.repo.saveRemessa({
-      sequence_number: seqNumber,
-      bill_ids: dto.bill_ids,
+    await this.sicoobSettingsRepository.incrementRemittanceSequence();
+
+    await this.billsRepository.markPendingCnab(dto.bill_ids);
+
+    const totalAmount = bills.reduce(
+      (s, b) => s + parseFloat(String(b.total_amount)),
+      0,
+    );
+
+    return this.CnabRepository.createRemittent({
+      sequence_number: sequenceNumber,
       bill_count: dto.bill_ids.length,
       total_amount: totalAmount,
-      file_path: `uploads/cnab/${filename}`,
+      file: {
+        url,
+        blob_path: blobPath,
+        original_name: filename,
+        mime_type: 'application/octet-stream',
+        size: buffer.byteLength,
+      },
+      bill_ids: dto.bill_ids,
     });
   }
 
-  async downloadRemessa(id: number): Promise<{ buffer: Buffer; filename: string }> {
-    const remessa = await this.repo.findRemessa(id);
-    if (!remessa) throw new NotFoundException(`Remessa ${id} not found`);
-
-    const fullPath = join(process.cwd(), remessa.file_path);
-    if (!existsSync(fullPath)) {
-      throw new NotFoundException('Remessa file not found on disk');
-    }
-
-    const buffer = readFileSync(fullPath);
-    const filename = remessa.file_path.split('/').pop()!;
-    return { buffer, filename };
+  async getRemittentDetail(id: number) {
+    const remittent = await this.CnabRepository.findRemittent(id);
+    if (!remittent) throw new NotFoundException(`Remessa ${id} não encontrada`);
+    const bills = await this.billsRepository.findByIds(remittent.bill_ids);
+    return { ...remittent, bills };
   }
 
-  listRemessas(page: number, limit: number) {
-    return this.repo.listRemessas(page, limit);
+  async downloadRemessa(id: number): Promise<{
+    buffer: Buffer;
+    filename: string;
+  }> {
+    const remittent = await this.CnabRepository.findRemittent(id);
+
+    if (!remittent) throw new NotFoundException(`Remessa ${id} não encontrada`);
+
+    const buffer = await this.azureBlobService
+      .download(remittent.file.blob_path)
+      .catch(() => {
+        throw new NotFoundException(
+          'Arquivo de remessa não encontrado no storage',
+        );
+      });
+
+    return {
+      buffer,
+      filename: remittent.file.original_name,
+    };
   }
 
-  async deleteRemessa(id: number) {
-    const remessa = await this.repo.findRemessa(id);
-    if (!remessa) throw new NotFoundException(`Remessa ${id} not found`);
+  async deleteRemittent(id: number) {
+    const remittent = await this.CnabRepository.findRemittent(id);
 
-    const billIds = (remessa.bill_ids as number[]);
-    await this.repo.revertBillsFromPendingCnab(billIds);
+    if (!remittent) throw new NotFoundException(`Remessa ${id} não encontrada`);
 
-    const fullPath = join(process.cwd(), remessa.file_path);
-    if (existsSync(fullPath)) unlinkSync(fullPath);
+    await this.azureBlobService.delete(remittent.file.blob_path);
 
-    return this.repo.deleteRemessa(id);
-  }
+    await this.billsRepository.revertFromPendingCnab(remittent.bill_ids);
 
-  listRetornos(page: number, limit: number) {
-    return this.repo.listRetornos(page, limit);
-  }
+    await this.CnabRepository.deleteRemessa(id);
 
-  async processRetorno(fileBuffer: Buffer): Promise<RetornoResult & { updated: number[]; retorno_id: number }> {
-    const content = iconv.decode(fileBuffer, 'win1252');
-    const result = parseRetorno(content);
-
-    const updated: number[] = [];
-    for (const entry of result.paid) {
-      const bill = await this.repo.markBillPaid(entry.billId, entry.paymentDate).catch(() => null);
-      if (bill) updated.push(entry.billId);
-      else result.errors.push(`Bill ${entry.billId} not found in the system`);
-    }
-
-    const retorno = await this.repo.saveRetorno({
-      paid_ids: updated,
-      rejected_ids: result.rejected,
-      errors: result.errors,
-      paid_count: updated.length,
-      rejected_count: result.rejected.length,
-    });
-
-    return { ...result, updated, retorno_id: retorno.id };
+    return remittent;
   }
 }

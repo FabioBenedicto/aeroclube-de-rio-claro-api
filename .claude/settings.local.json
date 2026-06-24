@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx prisma *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(docker *)",
+      "Bash(docker-compose up *)",
+      "Bash(git check-ignore *)",
+      "Bash(docker-compose ps *)",
+      "Bash(git rm *)",
+      "Bash(npx jest *)",
+      "Bash(node *)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@aeroclube.com\",\"password\":\"admin123\"}')",
+      "Bash(python3 -c \"import sys,json; print\\(json.dumps\\(json.load\\(sys.stdin\\), indent=2\\)\\)\" kill %1 echo \"Done\")"
+    ]
+  }
+}

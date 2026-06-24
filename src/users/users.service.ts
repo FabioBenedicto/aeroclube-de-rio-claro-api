@@ -1,94 +1,126 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { UsersRepository } from './users.repository';
 
-export interface CreateUserDto {
-  name: string;
-  email: string;
-  password: string;
-  role: Role;
-  permissions?: string[];
-}
-
-export interface UpdateUserDto {
-  name?: string;
-  email?: string;
-  password?: string;
-  role?: Role;
-  permissions?: string[];
-}
+import { CreateUserDto } from './dto/create-user.dto';
+import { FindAllUsersDto } from './dto/find-all-users.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { ERoles } from './enums/roles.enum';
+import {
+  IUsersRepository,
+  USERS_REPOSITORY,
+} from './repository/users-repository.interface';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: IUsersRepository,
+  ) {}
 
-  async findAll() {
-    const users = await this.usersRepository.findAll();
-    return users.map((u) => ({
-      ...u,
-      permissions: u.permissions.map((p) => p.permission),
-    }));
+  findAll(query: FindAllUsersDto) {
+    return this.usersRepository.findAll(query);
   }
 
   async create(dto: CreateUserDto) {
     const existing = await this.usersRepository.findByEmail(dto.email);
-    if (existing) throw new ConflictException('E-mail already registered');
+
+    if (existing) throw new ConflictException('E-mail já cadastrado');
 
     const password = await bcrypt.hash(dto.password, 10);
-    const user = await this.usersRepository.createUser({
+
+    return this.usersRepository.create({
       name: dto.name,
       email: dto.email,
       password,
       role: dto.role,
-      permissions: dto.role === Role.ADMIN ? [] : (dto.permissions ?? []),
+      permissions: dto.role === ERoles.ADMIN ? [] : (dto.permissions ?? []),
     });
-    return { ...user!, permissions: user!.permissions.map((p) => p.permission) };
   }
 
   async update(id: number, dto: UpdateUserDto, requesterId?: number) {
     const existing = await this.usersRepository.findById(id);
-    if (!existing) throw new NotFoundException('User not found');
 
-    if (requesterId !== undefined && requesterId !== id && existing.role === Role.ADMIN) {
-      throw new ForbiddenException('Cannot edit another administrator');
+    if (!existing) throw new NotFoundException('Usuário não encontrado');
+
+    if (requesterId !== undefined && requesterId === id) {
+      throw new ForbiddenException('Não é possível editar sua própria conta');
     }
 
-    const data: Partial<{ name: string; email: string; password: string; role: Role }> = {};
+    if (
+      requesterId !== undefined &&
+      requesterId !== id &&
+      existing.role === ERoles.ADMIN
+    ) {
+      throw new ForbiddenException('Não é possível editar outro administrador');
+    }
+
+    const data: Partial<{
+      name: string;
+      email: string;
+      password: string;
+      role: ERoles;
+    }> = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.password) data.password = await bcrypt.hash(dto.password, 10);
 
-    const permissions = dto.role === Role.ADMIN ? [] : dto.permissions;
-    const user = await this.usersRepository.updateUser(id, data, permissions);
-    return { ...user!, permissions: user!.permissions.map((p) => p.permission) };
+    const permissions = dto.role === ERoles.ADMIN ? [] : dto.permissions;
+
+    return this.usersRepository.update(id, data, permissions);
   }
 
-  async updateMe(id: number, dto: { name?: string; email?: string; password?: string; currentPassword?: string }) {
+  async updateMe(id: number, dto: UpdateMeDto) {
+    const user = await this.usersRepository.findById(id);
+
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
     if (dto.password) {
-      const user = await this.usersRepository.findById(id);
-      if (!user) throw new NotFoundException('User not found');
-      if (!dto.currentPassword) throw new BadRequestException('Provide the current password to change it');
-      const valid = await bcrypt.compare(dto.currentPassword, user.password);
-      if (!valid) throw new UnauthorizedException('Current password is incorrect');
-    }
-    return this.update(id, { name: dto.name, email: dto.email, password: dto.password });
-  }
+      if (!dto.currentPassword)
+        throw new BadRequestException('Informe a senha atual para alterá-la');
 
-  async remove(id: number, requesterId: number) {
-    if (id === requesterId) throw new ForbiddenException('Cannot delete your own user account');
-    const existing = await this.usersRepository.findById(id);
-    if (!existing) throw new NotFoundException('User not found');
-    if (existing.role === Role.ADMIN) {
-      throw new ForbiddenException('Cannot delete another administrator');
+      const valid = await bcrypt.compare(dto.currentPassword, user.password);
+
+      if (!valid) throw new UnauthorizedException('Senha atual incorreta');
     }
-    return this.usersRepository.removeUser(id);
+
+    return this.update(id, {
+      name: dto.name,
+      email: dto.email,
+      password: dto.password,
+    });
   }
 
   async removeSelf(id: number) {
     const existing = await this.usersRepository.findById(id);
-    if (!existing) throw new NotFoundException('User not found');
-    return this.usersRepository.removeUser(id);
+
+    if (!existing) throw new NotFoundException('Usuário não encontrado');
+
+    return this.usersRepository.delete(id);
+  }
+
+  async delete(id: number, requesterId?: number) {
+    if (requesterId !== undefined && requesterId === id) {
+      throw new ForbiddenException('Não é possível excluir sua própria conta');
+    }
+
+    const existing = await this.usersRepository.findById(id);
+
+    if (!existing) throw new NotFoundException('Usuário não encontrado');
+
+    if (existing.role === ERoles.ADMIN) {
+      throw new ForbiddenException('Não é possível excluir um administrador');
+    }
+
+    return this.usersRepository.delete(id);
   }
 }

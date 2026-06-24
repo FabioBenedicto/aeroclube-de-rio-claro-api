@@ -1,107 +1,166 @@
+import { faker } from '@faker-js/faker';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role } from '../generated/prisma';
 import * as bcrypt from 'bcrypt';
+
+import { User } from './model/user.model';
+import { FakeUsersRepository } from './repository/fake-users.repository';
+import { USERS_REPOSITORY } from './repository/users-repository.interface';
 import { UsersService } from './users.service';
-import { UsersRepository } from './users.repository';
 
-const mockRepo = {
-  findAll: jest.fn(),
-  findById: jest.fn(),
-  findByEmail: jest.fn(),
-  createUser: jest.fn(),
-  updateUser: jest.fn(),
-  removeUser: jest.fn(),
-};
-
-const userRow = {
-  id: 1, name: 'Admin', email: 'admin@test.com', role: Role.ADMIN,
-  created_at: new Date(), updated_at: new Date(),
-  permissions: [{ permission: 'flights:view' }],
-};
+const makeUser = (overrides: Partial<User> = {}): User => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  name: faker.person.fullName(),
+  email: faker.internet.email(),
+  password: faker.internet.password(),
+  role: Role.USER,
+  created_at: faker.date.past(),
+  updated_at: faker.date.recent(),
+  permissions: [],
+  ...overrides,
+});
 
 describe('UsersService', () => {
   let service: UsersService;
+  let repo: FakeUsersRepository;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: UsersRepository, useValue: mockRepo },
+        {
+          provide: USERS_REPOSITORY,
+          useClass: FakeUsersRepository,
+        },
       ],
     }).compile();
-    service = module.get<UsersService>(UsersService);
-    jest.clearAllMocks();
+    service = module.get(UsersService);
+    repo = module.get<FakeUsersRepository>(USERS_REPOSITORY);
   });
 
   describe('findAll', () => {
-    it('returns users with permissions as string[]', async () => {
-      mockRepo.findAll.mockResolvedValue([userRow]);
-      const result = await service.findAll();
-      expect(result[0].permissions).toEqual(['flights:view']);
+    it('returns paginated users', async () => {
+      const permission = faker.word.noun();
+      repo.users = [makeUser({ id: 1, permissions: [permission] })];
+      const result = await service.findAll({ page: 1, limit: 20 });
+      expect(result.data[0].permissions).toEqual([permission]);
+      expect(result.total).toBe(1);
+    });
+
+    it('filters by search term', async () => {
+      const target = makeUser({
+        id: 1,
+        name: 'Zephyr Unique',
+        email: 'zephyr@unique.com',
+      });
+      repo.users = [makeUser({ id: 2 }), target];
+      const result = await service.findAll({
+        page: 1,
+        limit: 20,
+        search: 'zephyr',
+      });
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].name).toBe(target.name);
     });
   });
 
   describe('create', () => {
     it('hashes password and creates user', async () => {
-      mockRepo.findByEmail.mockResolvedValue(null);
-      mockRepo.createUser.mockResolvedValue({ ...userRow, permissions: [] });
-      await service.create({ name: 'Test', email: 'test@test.com', password: 'pass123', role: Role.EMPLOYEE, permissions: [] });
-      const call = mockRepo.createUser.mock.calls[0][0];
-      expect(call.password).not.toBe('pass123');
-      const valid = await bcrypt.compare('pass123', call.password);
-      expect(valid).toBe(true);
+      const password = faker.internet.password();
+      await service.create({
+        name: faker.person.fullName(),
+        email: faker.internet.email(),
+        password,
+        role: Role.USER,
+        permissions: [],
+      });
+      const created = repo.users[0];
+      expect(created.password).not.toBe(password);
+      expect(await bcrypt.compare(password, created.password)).toBe(true);
     });
 
     it('throws ConflictException when email already exists', async () => {
-      mockRepo.findByEmail.mockResolvedValue(userRow);
+      const email = faker.internet.email();
+      repo.users = [makeUser({ email })];
       await expect(
-        service.create({ name: 'X', email: 'admin@test.com', password: 'x', role: Role.EMPLOYEE, permissions: [] }),
+        service.create({
+          name: faker.person.fullName(),
+          email,
+          password: faker.internet.password(),
+          role: Role.USER,
+          permissions: [],
+        }),
       ).rejects.toThrow(ConflictException);
     });
   });
 
   describe('update', () => {
-    it('updates user and returns result with permissions as string[]', async () => {
-      mockRepo.findById.mockResolvedValue(userRow);
-      const updated = { ...userRow, name: 'Updated', permissions: [{ permission: 'flights:view' }] };
-      mockRepo.updateUser.mockResolvedValue(updated);
-      const result = await service.update(1, { name: 'Updated' });
-      expect(result.name).toBe('Updated');
-      expect(result.permissions).toEqual(['flights:view']);
+    it('updates user and returns result', async () => {
+      const newName = faker.person.fullName();
+      repo.users = [makeUser({ id: 1 })];
+      const result = await service.update(1, { name: newName });
+      expect(result!.name).toBe(newName);
+      expect(Array.isArray(result!.permissions)).toBe(true);
     });
 
     it('throws NotFoundException when user does not exist', async () => {
-      mockRepo.findById.mockResolvedValue(null);
-      await expect(service.update(99, { name: 'X' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.update(faker.number.int({ min: 100 }), {
+          name: faker.person.fullName(),
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('hashes new password when provided', async () => {
-      mockRepo.findById.mockResolvedValue(userRow);
-      mockRepo.updateUser.mockResolvedValue({ ...userRow, permissions: [] });
-      await service.update(1, { password: 'newpass' });
-      const call = mockRepo.updateUser.mock.calls[0][1];
-      expect(call.password).toBeDefined();
-      const valid = await bcrypt.compare('newpass', call.password!);
-      expect(valid).toBe(true);
+      const newPassword = faker.internet.password();
+      repo.users = [makeUser({ id: 1 })];
+      await service.update(1, { password: newPassword });
+      expect(await bcrypt.compare(newPassword, repo.users[0].password)).toBe(
+        true,
+      );
+    });
+
+    it('throws ForbiddenException when editing another admin', async () => {
+      repo.users = [makeUser({ id: 1, role: Role.ADMIN })];
+      await expect(
+        service.update(1, { name: faker.person.fullName() }, 2),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows admin to edit their own account', async () => {
+      const newName = faker.person.fullName();
+      repo.users = [makeUser({ id: 1, role: Role.ADMIN })];
+      const result = await service.update(1, { name: newName }, 1);
+      expect(result!.name).toBe(newName);
     });
   });
 
-  describe('remove', () => {
-    it('removes user successfully', async () => {
-      mockRepo.findById.mockResolvedValue({ ...userRow, role: Role.EMPLOYEE });
-      mockRepo.removeUser.mockResolvedValue(userRow);
-      await service.remove(1, 2);
-      expect(mockRepo.removeUser).toHaveBeenCalledWith(1);
+  describe('delete', () => {
+    it('deletes user successfully', async () => {
+      repo.users = [makeUser({ id: 1, role: Role.USER })];
+      await service.delete(1, 2);
+      expect(repo.users).toHaveLength(0);
     });
 
     it('throws ForbiddenException when deleting own account', async () => {
-      await expect(service.remove(1, 1)).rejects.toThrow(ForbiddenException);
+      const id = faker.number.int({ min: 1, max: 100 });
+      await expect(service.delete(id, id)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when deleting an admin', async () => {
+      repo.users = [makeUser({ id: 1, role: Role.ADMIN })];
+      await expect(service.delete(1, 2)).rejects.toThrow(ForbiddenException);
     });
 
     it('throws NotFoundException when user does not exist', async () => {
-      mockRepo.findById.mockResolvedValue(null);
-      await expect(service.remove(99, 2)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.delete(faker.number.int({ min: 100 }), 2),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

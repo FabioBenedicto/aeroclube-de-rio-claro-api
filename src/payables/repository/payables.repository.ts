@@ -1,22 +1,27 @@
-import { Injectable } from '@nestjs/common';
-import { PayablePayment as PrismaPayablePayment, Prisma } from '@prisma/client';
+import { ERecurrence } from '@common/enums/recurrence.enum';
+import { EStakeholder } from '@common/enums/stakeholder.enum';
+import { ETitleStatus } from '@common/enums/title-status.enum';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { Decimal } from '@prisma/client-runtime-utils';
 import { plainToInstance } from 'class-transformer';
 import { addMonths, addWeeks, addYears, endOfDay, startOfDay } from 'date-fns';
+import { CreateFileData } from 'src/file/interfaces/create-file-data';
+import {
+  PayablePayment as PrismaPayablePayment,
+  Prisma,
+} from 'src/generated/prisma/client';
 
-import { paginate } from '../../common/dto/pagination.dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Recurrence } from '../../shared/enums/recurrence.enum';
-import { Stakeholder } from '../../shared/enums/stakeholder.enum';
-import { TitleStatus } from '../../shared/enums/title-status.enum';
-import { CreateFileData } from '../../shared/interfaces/create-file-data';
 import { CreatePayableDto } from '../dto/create-payable.dto';
 import { CreatePayablePaymentDto } from '../dto/create-payable-payment.dto';
 import { FindAllPayablesDto } from '../dto/find-all-payables.dto';
 import { UpdatePayableDto } from '../dto/update-payable.dto';
 import { Payable } from '../model/payable.model';
 import { PayablePayment } from '../model/payable-payment.model';
-import { IPayablesRepository } from './payables-repository.interface';
+import {
+  IPayablesRepository,
+  PayableStats,
+} from './payables-repository.interface';
 
 const include = {
   people: true,
@@ -36,75 +41,18 @@ const include = {
 type PayableRaw = Prisma.PayableGetPayload<{ include: typeof include }>;
 
 function toPayable(raw: PayableRaw): Payable {
-  return plainToInstance(Payable, {
-    ...raw,
-    total_amount: Number(raw.total_amount),
-    amount_paid: Number(raw.amount_paid),
-    people: raw.people
-      ? { ...raw.people, credit_balance: Number(raw.people.credit_balance) }
-      : null,
-    student: raw.student
-      ? {
-          ...raw.student,
-          people: {
-            ...raw.student.people,
-            credit_balance: Number(raw.student.people.credit_balance),
-          },
-        }
-      : null,
-    aircraft: raw.aircraft
-      ? {
-          ...raw.aircraft,
-          flight_hour_value:
-            raw.aircraft.flight_hour_value !== null
-              ? Number(raw.aircraft.flight_hour_value)
-              : null,
-        }
-      : null,
-    instructor: raw.instructor
-      ? {
-          ...raw.instructor,
-          people: {
-            ...raw.instructor.people,
-            credit_balance: Number(raw.instructor.people.credit_balance),
-          },
-        }
-      : null,
-    partner: raw.partner
-      ? {
-          ...raw.partner,
-          monthly_dues: Number(raw.partner.monthly_dues),
-          people: {
-            ...raw.partner.people,
-            credit_balance: Number(raw.partner.people.credit_balance),
-          },
-        }
-      : null,
-    employee: raw.employee
-      ? {
-          ...raw.employee,
-          people: {
-            ...raw.employee.people,
-            credit_balance: Number(raw.employee.people.credit_balance),
-          },
-        }
-      : null,
-    payments: raw.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
-  });
+  return plainToInstance(Payable, raw);
 }
 
 function toPayment(raw: PrismaPayablePayment): PayablePayment {
-  return plainToInstance(PayablePayment, {
-    ...raw,
-    amount: Number(raw.amount),
-  });
+  return plainToInstance(PayablePayment, raw);
 }
 
 @Injectable()
 export class PayablesRepository implements IPayablesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll({
+  private buildWhere({
     status,
     person_id,
     instructor_id,
@@ -112,16 +60,14 @@ export class PayablesRepository implements IPayablesRepository {
     search,
     date_from,
     date_to,
-    page = 1,
-    limit = 20,
-  }: FindAllPayablesDto) {
+  }: FindAllPayablesDto): Prisma.PayableWhereInput | undefined {
     const AND: Prisma.PayableWhereInput[] = [];
 
-    if (status === 'overdue') {
-      AND.push({ status: { not: TitleStatus.PAID } });
+    if (status === ETitleStatus.OVERDUE) {
+      AND.push({ status: { not: ETitleStatus.PAID } });
       AND.push({ expiration_date: { lt: new Date() } });
     } else if (status) {
-      AND.push({ status: status as TitleStatus });
+      AND.push({ status });
     }
 
     if (person_id) AND.push({ people_id: person_id });
@@ -161,7 +107,12 @@ export class PayablesRepository implements IPayablesRepository {
       AND.push({ created_at: range });
     }
 
-    const where = AND.length > 0 ? { AND } : undefined;
+    return AND.length > 0 ? { AND } : undefined;
+  }
+
+  async findAll(dto: FindAllPayablesDto) {
+    const { page = 1, limit = 20 } = dto;
+    const where = this.buildWhere(dto);
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.prisma.$transaction([
@@ -175,12 +126,31 @@ export class PayablesRepository implements IPayablesRepository {
       this.prisma.payable.count({ where }),
     ]);
 
-    return paginate(
-      data.map((p) => toPayable(p)),
+    return {
+      data: data.map((p) => toPayable(p)),
       total,
       page,
       limit,
-    );
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getStats(dto: FindAllPayablesDto): Promise<PayableStats> {
+    const where = this.buildWhere(dto);
+    const aggregate = await this.prisma.payable.aggregate({
+      where,
+      _sum: { total_amount: true, amount_paid: true },
+    });
+    return {
+      total_amount:
+        aggregate._sum.total_amount != null
+          ? Number(aggregate._sum.total_amount)
+          : 0,
+      amount_paid:
+        aggregate._sum.amount_paid != null
+          ? Number(aggregate._sum.amount_paid)
+          : 0,
+    };
   }
 
   async findById(id: number) {
@@ -206,29 +176,31 @@ export class PayablesRepository implements IPayablesRepository {
     ...dto
   }: CreatePayableDto) {
     const payerRelation = {
-      [Stakeholder.PEOPLE]: { people: { connect: { id: person_id } } },
-      [Stakeholder.STUDENT]: { student: { connect: { id: student_id } } },
-      [Stakeholder.COMPANY]: { company: { connect: { id: company_id } } },
-      [Stakeholder.INSTRUCTOR]: {
+      [EStakeholder.PEOPLE]: { people: { connect: { id: person_id } } },
+      [EStakeholder.STUDENT]: { student: { connect: { id: student_id } } },
+      [EStakeholder.COMPANY]: { company: { connect: { id: company_id } } },
+      [EStakeholder.INSTRUCTOR]: {
         instructor: { connect: { id: instructor_id } },
       },
-      [Stakeholder.PARTNER]: { partner: { connect: { id: partner_id } } },
-      [Stakeholder.EMPLOYEE]: { employee: { connect: { id: employee_id } } },
-      [Stakeholder.NONE]: {},
+      [EStakeholder.PARTNER]: { partner: { connect: { id: partner_id } } },
+      [EStakeholder.EMPLOYEE]: { employee: { connect: { id: employee_id } } },
+      [EStakeholder.NONE]: {},
     }[dto.stakeholder];
 
     const relations = {
       ...payerRelation,
       ...(plane_id && { aircraft: { connect: { id: plane_id } } }),
-      ...(payable_type_id && { payable_type: { connect: { id: payable_type_id } } }),
+      ...(payable_type_id && {
+        payable_type: { connect: { id: payable_type_id } },
+      }),
     };
 
     if (recurrence) {
       const expiration_dates = Array.from({ length: occurrences }, (_, i) => {
         return {
-          [Recurrence.WEEKLY]: addWeeks(dto.expiration_date, i),
-          [Recurrence.MONTHLY]: addMonths(dto.expiration_date, i),
-          [Recurrence.YEARLY]: addYears(dto.expiration_date, i),
+          [ERecurrence.WEEKLY]: addWeeks(dto.expiration_date, i),
+          [ERecurrence.MONTHLY]: addMonths(dto.expiration_date, i),
+          [ERecurrence.YEARLY]: addYears(dto.expiration_date, i),
         }[recurrence];
       });
 
@@ -273,37 +245,37 @@ export class PayablesRepository implements IPayablesRepository {
     const payerRelation =
       dto.stakeholder &&
       {
-        [Stakeholder.PEOPLE]: {
+        [EStakeholder.PEOPLE]: {
           people: person_id
             ? { connect: { id: person_id } }
             : { disconnect: true },
         },
-        [Stakeholder.STUDENT]: {
+        [EStakeholder.STUDENT]: {
           student: student_id
             ? { connect: { id: student_id } }
             : { disconnect: true },
         },
-        [Stakeholder.COMPANY]: {
+        [EStakeholder.COMPANY]: {
           company: company_id
             ? { connect: { id: company_id } }
             : { disconnect: true },
         },
-        [Stakeholder.INSTRUCTOR]: {
+        [EStakeholder.INSTRUCTOR]: {
           instructor: instructor_id
             ? { connect: { id: instructor_id } }
             : { disconnect: true },
         },
-        [Stakeholder.PARTNER]: {
+        [EStakeholder.PARTNER]: {
           partner: partner_id
             ? { connect: { id: partner_id } }
             : { disconnect: true },
         },
-        [Stakeholder.EMPLOYEE]: {
+        [EStakeholder.EMPLOYEE]: {
           employee: employee_id
             ? { connect: { id: employee_id } }
             : { disconnect: true },
         },
-        [Stakeholder.NONE]: {},
+        [EStakeholder.NONE]: {},
       }[dto.stakeholder];
 
     const relations = {
@@ -331,11 +303,7 @@ export class PayablesRepository implements IPayablesRepository {
 
   async delete(id: number) {
     const result = await this.prisma.payable.delete({ where: { id } });
-    return plainToInstance(Payable, {
-      ...result,
-      total_amount: Number(result.total_amount),
-      amount_paid: Number(result.amount_paid),
-    });
+    return plainToInstance(Payable, result);
   }
 
   async findPaymentById(paymentId: number) {
@@ -353,8 +321,8 @@ export class PayablesRepository implements IPayablesRepository {
 
       const newAmountPaid = payable.amount_paid.add(new Decimal(dto.amount));
       const status = newAmountPaid.gte(payable.total_amount)
-        ? TitleStatus.PAID
-        : TitleStatus.PARTIAL;
+        ? ETitleStatus.PAID
+        : ETitleStatus.PARTIAL;
 
       await tx.payablePayment.create({
         data: {
@@ -392,8 +360,8 @@ export class PayablesRepository implements IPayablesRepository {
           : newAmountPaid;
 
         const status = newAmountPaidClamped.lte(0)
-          ? TitleStatus.OPEN
-          : TitleStatus.PARTIAL;
+          ? ETitleStatus.PENDING
+          : ETitleStatus.PARTIAL;
 
         await tx.payable.update({
           where: { id: payable.id },
@@ -449,5 +417,16 @@ export class PayablesRepository implements IPayablesRepository {
     });
 
     return toPayment(result);
+  }
+
+  async bulkDelete(ids: number[]): Promise<void> {
+    const count = await this.prisma.payable.count({
+      where: { id: { in: ids } },
+    });
+    if (count !== ids.length)
+      throw new UnprocessableEntityException(
+        'Um ou mais pagáveis não foram encontrados',
+      );
+    await this.prisma.payable.deleteMany({ where: { id: { in: ids } } });
   }
 }

@@ -1,19 +1,35 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, UseGuards, ParseIntPipe, HttpCode, HttpStatus, Res, BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+
+import { PERMISSIONS } from '../common/constants/permissions';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { PERM } from '../common/constants/permissions';
+import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
+import { PaginatedResponse } from '../common/swagger/paginated-response';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
+import { FindAllCompaniesDto } from './dto/find-all-companies.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { buildExcel, reportFilename } from '../common/utils/excel.util';
-import { ExportThrottle } from '../common/decorators/export-throttle.decorator';
-import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
+import { Company } from './model/company.model';
 
 @ApiTags('companies')
 @ApiBearerAuth()
@@ -22,78 +38,52 @@ import { MAX_EXPORT_ROWS } from '../common/constants/export.constants';
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
-  @Get('export')
-  @RequirePermission(PERM.COMPANIES.VIEW)
-  @ExportThrottle()
-  async export(
-    @Query('search') search: string,
-    @Query('date_from') dateFrom: string,
-    @Query('date_to') dateTo: string,
-    @Res() res: Response,
-  ) {
-    const { total } = await this.companiesService.findAll(search, dateFrom, dateTo, 1, 1);
-    if (total > MAX_EXPORT_ROWS) {
-      throw new BadRequestException(
-        `There are ${total} records. Use filters to reduce to at most ${MAX_EXPORT_ROWS}.`,
-      );
-    }
-    const { data } = await this.companiesService.findAll(search, dateFrom, dateTo, 1, total || 1);
-    const rows = (data as any[]).map((c) => ({
-      id: c.id,
-      name: c.name,
-      cnpj: c.cnpj ?? '',
-      email: c.email ?? '',
-      phone: c.phone ?? '',
-    }));
-
-    const buffer = await buildExcel('Companies', [
-      { header: 'ID', key: 'id', width: 10 },
-      { header: 'Name', key: 'name', width: 35 },
-      { header: 'CNPJ', key: 'cnpj', width: 20 },
-      { header: 'E-mail', key: 'email', width: 30 },
-      { header: 'Phone', key: 'phone', width: 18 },
-    ], rows);
-
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${reportFilename('companies.xlsx')}"`,
-    });
-    res.send(buffer);
-  }
-
   @Get()
-  @RequirePermission(PERM.COMPANIES.VIEW)
-  findAll(
-    @Query('search') search?: string,
-    @Query('date_from') dateFrom?: string,
-    @Query('date_to') dateTo?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
-    return this.companiesService.findAll(search, dateFrom, dateTo, Number(page), Number(limit));
+  @RequirePermission(PERMISSIONS.COMPANIES.VIEW)
+  @ApiOperation({ summary: 'List companies' })
+  @ApiResponse({ type: PaginatedResponse(Company) })
+  findAll(@Query() query: FindAllCompaniesDto) {
+    return this.companiesService.findAll(query);
   }
 
   @Get(':id')
-  @RequirePermission(PERM.COMPANIES.VIEW)
+  @RequirePermission(PERMISSIONS.COMPANIES.VIEW)
+  @ApiOperation({ summary: 'Get company' })
+  @ApiResponse({ type: Company })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.companiesService.findOne(id);
   }
 
   @Post()
-  @RequirePermission(PERM.COMPANIES.CREATE)
+  @RequirePermission(PERMISSIONS.COMPANIES.CREATE)
+  @ApiOperation({ summary: 'Create company' })
+  @ApiResponse({ type: Company })
   create(@Body() dto: CreateCompanyDto) {
     return this.companiesService.create(dto);
   }
 
   @Patch(':id')
-  @RequirePermission(PERM.COMPANIES.UPDATE)
+  @RequirePermission(PERMISSIONS.COMPANIES.UPDATE)
+  @ApiOperation({ summary: 'Update company' })
+  @ApiResponse({ type: Company })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCompanyDto) {
     return this.companiesService.update(id, dto);
   }
 
-  @Delete(':id')
-  @RequirePermission(PERM.COMPANIES.DELETE)
+  @Delete('bulk')
+  @RequirePermission(PERMISSIONS.COMPANIES.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Bulk delete companies' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.companiesService.bulkDelete(dto.ids);
+  }
+
+  @Delete(':id')
+  @RequirePermission(PERMISSIONS.COMPANIES.DELETE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete company' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.companiesService.delete(id);
   }

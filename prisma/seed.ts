@@ -1,8 +1,10 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
+import { Pool } from 'pg';
+
+import { PrismaClient, Role } from '../src/generated/prisma/client';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -18,7 +20,7 @@ async function main() {
       name: 'Laura Administradora',
       email: 'admin@aeroclube.com',
       password,
-      role: 'ADMIN',
+      role: Role.ADMIN,
     },
   });
   await prisma.user.upsert({
@@ -28,39 +30,337 @@ async function main() {
       name: 'Tiago Funcionário',
       email: 'func@aeroclube.com',
       password,
-      role: 'EMPLOYEE',
+      role: Role.USER,
     },
   });
 
-  // Planes
-  await prisma.plane.createMany({
+  // Permissions catalog
+  const PERMISSION_CATALOG: Array<{
+    key: string;
+    module: string;
+    module_label: string;
+    action: string;
+    action_label: string;
+  }> = [
+    {
+      key: 'receivables:view',
+      module: 'receivables',
+      module_label: 'Títulos a receber',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'receivables:create',
+      module: 'receivables',
+      module_label: 'Títulos a receber',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'receivables:update',
+      module: 'receivables',
+      module_label: 'Títulos a receber',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'receivables:delete',
+      module: 'receivables',
+      module_label: 'Títulos a receber',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'payables:view',
+      module: 'payables',
+      module_label: 'Títulos a pagar',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'payables:create',
+      module: 'payables',
+      module_label: 'Títulos a pagar',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'payables:update',
+      module: 'payables',
+      module_label: 'Títulos a pagar',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'payables:delete',
+      module: 'payables',
+      module_label: 'Títulos a pagar',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'bills:view',
+      module: 'bills',
+      module_label: 'Faturas',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'bills:create',
+      module: 'bills',
+      module_label: 'Faturas',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'bills:update',
+      module: 'bills',
+      module_label: 'Faturas',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'bills:delete',
+      module: 'bills',
+      module_label: 'Faturas',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'flights:view',
+      module: 'flights',
+      module_label: 'Voos',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'flights:create',
+      module: 'flights',
+      module_label: 'Voos',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'flights:update',
+      module: 'flights',
+      module_label: 'Voos',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'flights:delete',
+      module: 'flights',
+      module_label: 'Voos',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'aircraft:view',
+      module: 'aircraft',
+      module_label: 'Aeronaves',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'aircraft:create',
+      module: 'aircraft',
+      module_label: 'Aeronaves',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'aircraft:update',
+      module: 'aircraft',
+      module_label: 'Aeronaves',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'aircraft:delete',
+      module: 'aircraft',
+      module_label: 'Aeronaves',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'customers:view',
+      module: 'customers',
+      module_label: 'Pessoas',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'customers:create',
+      module: 'customers',
+      module_label: 'Pessoas',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'customers:update',
+      module: 'customers',
+      module_label: 'Pessoas',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'customers:delete',
+      module: 'customers',
+      module_label: 'Pessoas',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'companies:view',
+      module: 'companies',
+      module_label: 'Empresas',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'companies:create',
+      module: 'companies',
+      module_label: 'Empresas',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'companies:update',
+      module: 'companies',
+      module_label: 'Empresas',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'companies:delete',
+      module: 'companies',
+      module_label: 'Empresas',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+    {
+      key: 'reports:view',
+      module: 'reports',
+      module_label: 'Relatórios',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'title-types:view',
+      module: 'title-types',
+      module_label: 'Tipos de Título',
+      action: 'view',
+      action_label: 'Visualizar',
+    },
+    {
+      key: 'title-types:create',
+      module: 'title-types',
+      module_label: 'Tipos de Título',
+      action: 'create',
+      action_label: 'Criar',
+    },
+    {
+      key: 'title-types:update',
+      module: 'title-types',
+      module_label: 'Tipos de Título',
+      action: 'update',
+      action_label: 'Editar',
+    },
+    {
+      key: 'title-types:delete',
+      module: 'title-types',
+      module_label: 'Tipos de Título',
+      action: 'delete',
+      action_label: 'Excluir',
+    },
+  ];
+  for (const p of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: { key: p.key },
+      update: {},
+      create: p,
+    });
+  }
+
+  // Receivable / payable types
+  for (const name of ['FLIGHT', 'MENSALIDADE', 'OUTROS']) {
+    await prisma.receivableType.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+  for (const name of ['INSTRUCTION', 'OUTROS']) {
+    await prisma.payableType.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+
+  // Aircraft
+  await prisma.aircraft.createMany({
     skipDuplicates: true,
     data: [
       {
-        registration: 'PR-AEC',
-        model: 'Cessna 152',
-        flight_hour_value: 680.0,
+        registration: 'PP-NVA',
+        model: 'Neiva 56-C-1',
+        type: 'AIRPLANE',
+        flight_hour_value: null,
+      },
+      {
+        registration: 'PP-PAC',
+        model: 'Piper Aircraft J3C-65',
+        type: 'AIRPLANE',
+        flight_hour_value: null,
       },
       {
         registration: 'PT-RCL',
-        model: 'Cessna 172N',
-        flight_hour_value: 890.0,
+        model: 'Cessna Aircraft 172D',
+        type: 'AIRPLANE',
+        flight_hour_value: null,
       },
       {
-        registration: 'PP-ARC',
-        model: 'Piper PA-28',
-        flight_hour_value: 950.0,
+        registration: 'PR-AEC',
+        model: 'Cessna Aircraft 152',
+        type: 'AIRPLANE',
+        flight_hour_value: null,
       },
       {
-        registration: 'PT-AEE',
-        model: 'Tecnam P2002',
-        flight_hour_value: 760.0,
+        registration: 'PP-ABR',
+        model: 'Aero Boero AB-180',
+        type: 'AIRPLANE',
+        flight_hour_value: null,
+      },
+      {
+        registration: 'PP-ZPC',
+        model: 'PZL-Bielsko SZD-50-3 Puchacz',
+        type: 'GLIDER',
+        flight_hour_value: null,
+      },
+      {
+        registration: 'PP-GRB',
+        model: 'Grob G103',
+        type: 'GLIDER',
+        flight_hour_value: null,
+      },
+      {
+        registration: 'PP-ZJT',
+        model: 'PZL-Bielsko SZD-48-1 Jantar 2',
+        type: 'GLIDER',
+        flight_hour_value: null,
+      },
+      {
+        registration: 'PP-PW5',
+        model: 'PZL Swidnik PW-5',
+        type: 'GLIDER',
+        flight_hour_value: null,
       },
     ],
   });
 
-  // Customers
-  const customersData = [
+  // People
+  const peopleData = [
     {
       cpf: '412.908.557-03',
       name: 'Helena Marques',
@@ -118,25 +418,25 @@ async function main() {
       flight_hour_balance: 0,
     },
   ];
-  for (const c of customersData) {
-    await prisma.person.upsert({
-      where: { cpf: c.cpf },
+
+  for (const p of peopleData) {
+    await prisma.people.upsert({
+      where: { cpf: p.cpf },
       update: {},
-      create: c,
+      create: { ...p },
     });
   }
 
-  const customers = await prisma.person.findMany({ orderBy: { id: 'asc' } });
-  const byName = (name: string) => customers.find((c) => c.name === name)!;
+  const people = await prisma.people.findMany({ orderBy: { id: 'asc' } });
+  const byName = (name: string) => people.find((p) => p.name === name)!;
 
   // Instructors (Rafael, Diego, Juliana)
   for (const name of ['Rafael Ozório', 'Diego Fontana', 'Juliana Ribeiro']) {
-    const c = byName(name);
+    const p = byName(name);
     const exists = await prisma.instructor.findFirst({
-      where: { customer_id: c.id },
+      where: { people_id: p.id },
     });
-    if (!exists)
-      await prisma.instructor.create({ data: { customer_id: c.id } });
+    if (!exists) await prisma.instructor.create({ data: { people_id: p.id } });
   }
 
   // Students (Helena, Beatriz, André, Marina)
@@ -146,11 +446,11 @@ async function main() {
     'André Kobayashi',
     'Marina Prado',
   ]) {
-    const c = byName(name);
+    const p = byName(name);
     const exists = await prisma.student.findFirst({
-      where: { customer_id: c.id },
+      where: { people_id: p.id },
     });
-    if (!exists) await prisma.student.create({ data: { customer_id: c.id } });
+    if (!exists) await prisma.student.create({ data: { people_id: p.id } });
   }
 
   // Partners (Rafael, Beatriz, Clara, Juliana)
@@ -160,13 +460,13 @@ async function main() {
     'Clara Nogueira',
     'Juliana Ribeiro',
   ]) {
-    const c = byName(name);
+    const p = byName(name);
     const exists = await prisma.partner.findFirst({
-      where: { customer_id: c.id },
+      where: { people_id: p.id },
     });
     if (!exists)
       await prisma.partner.create({
-        data: { customer_id: c.id, monthly_dues: 320.0, status: 'active' },
+        data: { people_id: p.id, monthly_dues: 320.0, status: 'active' },
       });
   }
 

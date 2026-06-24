@@ -1,21 +1,20 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-
-import { IsCnpj } from '@common/validators';
+import { IsCNPJ } from '@common/decorators/is-cnpj.decorator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateCompanyDto {
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @IsCnpj()
+  @IsCNPJ()
   @IsNotEmpty()
   cnpj: string;
 
   @IsEmail()
-  @IsOptional()
-  email?: string;
+  @IsNotEmpty()
+  email: string;
 
   @IsString()
-  @IsOptional()
-  phone?: string;
+  @IsNotEmpty()
+  phone: string;
 }

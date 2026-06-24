@@ -1,9 +1,14 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService, ConfigType } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigType } from '@nestjs/config';
-import { jwtConfig } from '../../config/jwt.config';
-import { UsersRepository } from '../../users/users.repository';
+
+import { jwtConfig } from '../../common/config/jwt.config';
+import { User } from '../../users/model/user.model';
+import {
+  IUsersRepository,
+  USERS_REPOSITORY,
+} from '../../users/repository/users-repository.interface';
 
 export interface JwtPayload {
   sub: number;
@@ -14,27 +19,24 @@ export interface JwtPayload {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Inject(jwtConfig.KEY) config: ConfigType<typeof jwtConfig>,
-    private readonly usersRepository: UsersRepository,
+
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: IUsersRepository,
+
+    private readonly configService: ConfigService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.secret,
+      secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload): Promise<User> {
     const user = await this.usersRepository.findById(payload.sub);
 
-    if (!user) {
-      throw new UnauthorizedException();
-    }
+    if (!user) throw new UnauthorizedException();
 
-    const { password, permissions, ...safeUser } = user;
-
-    return {
-      ...safeUser,
-      permissions: permissions.map((p) => p.permission),
-    };
+    return user;
   }
 }
