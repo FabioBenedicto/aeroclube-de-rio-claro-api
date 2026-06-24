@@ -1,23 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { DashboardRepository } from './dashboard.repository';
+import { Inject, Injectable } from '@nestjs/common';
+
+import {
+  DASHBOARD_REPOSITORY,
+  IDashboardRepository,
+} from './repository/dashboard-repository.interface';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly repo: DashboardRepository) {}
+  constructor(
+    @Inject(DASHBOARD_REPOSITORY)
+    private readonly dashboardRepository: IDashboardRepository,
+  ) {}
 
   async getSummary() {
-    const d = await this.repo.getSummaryData();
+    const d = await this.dashboardRepository.getSummaryData();
+
     return {
-      receivables: {
-        total: d.totalReceivables._sum.total_amount ?? 0,
-        open: d.openReceivables._sum.total_amount ?? 0,
-      },
-      payables: {
-        total: d.totalPayables._sum.amount ?? 0,
-        open: d.openPayables._sum.amount ?? 0,
-      },
-      flights: { today: d.flightsToday, in_flight: d.inFlight },
-      persons: d.activePersons,
+      receivables: { total: d.totalReceivables, open: d.openReceivables },
+      payables:    { total: d.totalPayables,    open: d.openPayables    },
+      flights:     { today: d.flightsToday,     in_flight: d.inFlight   },
+      people:      d.activePeople,
     };
   }
 }
