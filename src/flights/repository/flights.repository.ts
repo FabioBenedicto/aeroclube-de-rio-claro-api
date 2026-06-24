@@ -31,6 +31,7 @@ const flightDetailInclude = {
   people: true,
   instructor: { include: { people: true } },
   receivables: true,
+  payables: { include: { instructor: { include: { people: true } } } },
 };
 
 type FlightRaw = Prisma.FlightGetPayload<{ include: typeof flightInclude }>;
@@ -58,6 +59,11 @@ function toFlightDetail(raw: FlightDetailRaw): Flight {
       ...r,
       total_amount: Number(r.total_amount),
       amount_received: Number(r.amount_received),
+    })),
+    payables: raw.payables.map((p) => ({
+      ...p,
+      total_amount: Number(p.total_amount),
+      amount_paid: Number(p.amount_paid),
     })),
   });
 }
@@ -103,6 +109,7 @@ export class FlightsRepository implements IFlightsRepository {
           data: {
             people: { connect: { id: r.peopleId } },
             flight: { connect: { id: flight.id } },
+            aircraft: { connect: { id: data.aircraftId } },
             title: r.title,
             ...(r.description && { description: r.description }),
             expiration_date: r.expirationDate,
@@ -118,7 +125,9 @@ export class FlightsRepository implements IFlightsRepository {
         const p = data.buildPayable(flight.id);
         await tx.payable.create({
           data: {
+            stakeholder: 'INSTRUCTOR',
             instructor: { connect: { id: p.instructorId } },
+            flight: { connect: { id: flight.id } },
             title: p.title,
             ...(p.description && { description: p.description }),
             total_amount: p.amount,
@@ -348,6 +357,7 @@ export class FlightsRepository implements IFlightsRepository {
           data: {
             people: { connect: { id: r.peopleId } },
             flight: { connect: { id } },
+            aircraft: { connect: { id: flight.aircraft_id } },
             title: r.title,
             expiration_date: r.expirationDate,
             total_amount: r.totalAmount,
@@ -362,7 +372,9 @@ export class FlightsRepository implements IFlightsRepository {
         const p = data.buildPayable();
         await tx.payable.create({
           data: {
+            stakeholder: 'INSTRUCTOR',
             instructor: { connect: { id: p.instructorId } },
+            flight: { connect: { id } },
             title: p.title,
             total_amount: p.amount,
             payable_type: { connect: { id: p.payable_type_id } },

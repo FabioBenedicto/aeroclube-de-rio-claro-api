@@ -13,17 +13,12 @@ exports.Settings = void 0;
 const class_transformer_1 = require("class-transformer");
 class Settings {
     id;
-    partner_monthly_dues;
     instructor_percentage;
     glider_initial_minutes;
     glider_initial_value;
     glider_minute_value;
 }
 exports.Settings = Settings;
-__decorate([
-    (0, class_transformer_1.Type)(() => Number),
-    __metadata("design:type", Number)
-], Settings.prototype, "partner_monthly_dues", void 0);
 __decorate([
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)

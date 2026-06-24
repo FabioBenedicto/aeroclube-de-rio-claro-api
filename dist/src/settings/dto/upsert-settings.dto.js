@@ -15,12 +15,11 @@ const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 class UpsertSettingsDto {
     instructor_percentage;
-    partner_monthly_dues;
     glider_initial_minutes;
     glider_initial_value;
     glider_minute_value;
     static _OPENAPI_METADATA_FACTORY() {
-        return { instructor_percentage: { required: false, type: () => Number, minimum: 0, maximum: 100 }, partner_monthly_dues: { required: false, type: () => Number, minimum: 0 }, glider_initial_minutes: { required: false, type: () => Number, minimum: 1 }, glider_initial_value: { required: false, type: () => Number, minimum: 0 }, glider_minute_value: { required: false, type: () => Number, minimum: 0 } };
+        return { instructor_percentage: { required: false, type: () => Number, minimum: 0, maximum: 100 }, glider_initial_minutes: { required: false, type: () => Number, minimum: 1 }, glider_initial_value: { required: false, type: () => Number, minimum: 0 }, glider_minute_value: { required: false, type: () => Number, minimum: 0 } };
     }
 }
 exports.UpsertSettingsDto = UpsertSettingsDto;
@@ -32,13 +31,6 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)
 ], UpsertSettingsDto.prototype, "instructor_percentage", void 0);
-__decorate([
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.Min)(0),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Type)(() => Number),
-    __metadata("design:type", Number)
-], UpsertSettingsDto.prototype, "partner_monthly_dues", void 0);
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),

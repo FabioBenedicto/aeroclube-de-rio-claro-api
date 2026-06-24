@@ -122,8 +122,9 @@ let ReportsService = class ReportsService {
         }
         const where = AND.length > 0 ? { AND } : {};
         const limit = Math.min(dto.limit ?? 500, 1000);
+        const skip = dto.offset ?? (dto.page && dto.page > 1 ? (dto.page - 1) * limit : 0);
         if (dto.groupBy?.length) {
-            return this.runGrouped(dto.entity, mergedSchema, where, dto.groupBy, dto.aggregations ?? [], limit, mergedInclude);
+            return this.runGrouped(dto.entity, mergedSchema, where, dto.groupBy, dto.aggregations ?? [], limit, skip, mergedInclude);
         }
         const requestedFields = (dto.columns ?? []).map((key) => {
             const f = mergedSchema.find((s) => s.key === key);
@@ -131,9 +132,9 @@ let ReportsService = class ReportsService {
                 throw new common_1.BadRequestException(`Campo desconhecido: ${key}`);
             return f;
         });
-        return this.runFind(dto.entity, requestedFields, where, limit, mergedInclude);
+        return this.runFind(dto.entity, requestedFields, where, limit, skip, mergedInclude);
     }
-    async runFind(entity, fields, where, limit, include) {
+    async runFind(entity, fields, where, limit, skip, include) {
         const finalInclude = {
             ...this.computeBaseInclude(entity, fields),
             ...(include ?? {}),
@@ -142,6 +143,7 @@ let ReportsService = class ReportsService {
             where,
             include: finalInclude,
             take: limit,
+            skip,
             orderBy: { id: 'asc' },
         });
         return rows.map((row) => {
@@ -190,7 +192,7 @@ let ReportsService = class ReportsService {
             this.serializeValue(val),
         ])));
     }
-    async runGrouped(entity, schema, where, groupByKeys, aggregations, limit, _include) {
+    async runGrouped(entity, schema, where, groupByKeys, aggregations, limit, skip, _include) {
         const groupFields = groupByKeys.map((key) => {
             const f = schema.find((s) => s.key === key);
             if (!f)
@@ -234,6 +236,7 @@ let ReportsService = class ReportsService {
             ...(hasCount && { _count: { id: true } }),
             orderBy: by.map((f) => ({ [f]: 'asc' })),
             take: limit,
+            skip,
         });
         return groupResult.map((row) => {
             const result = {};

@@ -39,4 +39,15 @@ export class Flight {
     amount_received: number;
     receivable_type_id: number;
   }[];
+
+  payables?: {
+    id: number;
+    total_amount: number;
+    amount_paid: number;
+    instructor_id: number | null;
+    instructor?: {
+      id: number;
+      people: { id: number; name: string; email: string } | null;
+    } | null;
+  }[];
 }

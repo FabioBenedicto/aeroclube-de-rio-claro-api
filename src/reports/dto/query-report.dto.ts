@@ -106,6 +106,16 @@ export class QueryReportDto {
   @Min(1)
   @Max(1000)
   limit?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  offset?: number;
 }
 
 export class RawQueryDto {

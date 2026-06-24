@@ -142,6 +142,8 @@ export class ReportsService {
     }
     const where = AND.length > 0 ? { AND } : {};
     const limit = Math.min(dto.limit ?? 500, 1000);
+    const skip =
+      dto.offset ?? (dto.page && dto.page > 1 ? (dto.page - 1) * limit : 0);
 
     if (dto.groupBy?.length) {
       return this.runGrouped(
@@ -151,6 +153,7 @@ export class ReportsService {
         dto.groupBy,
         dto.aggregations ?? [],
         limit,
+        skip,
         mergedInclude,
       );
     }
@@ -166,6 +169,7 @@ export class ReportsService {
       requestedFields,
       where,
       limit,
+      skip,
       mergedInclude,
     );
   }
@@ -175,6 +179,7 @@ export class ReportsService {
     fields: FieldDef[],
     where: any,
     limit: number,
+    skip: number,
     include?: any,
   ) {
     const finalInclude = {
@@ -185,6 +190,7 @@ export class ReportsService {
       where,
       include: finalInclude,
       take: limit,
+      skip,
       orderBy: { id: 'asc' },
     });
     return rows.map((row: any) => {
@@ -255,6 +261,7 @@ export class ReportsService {
     groupByKeys: string[],
     aggregations: AggregationDto[],
     limit: number,
+    skip: number,
     _include?: any,
   ) {
     const groupFields = groupByKeys.map((key) => {
@@ -306,6 +313,7 @@ export class ReportsService {
       ...(hasCount && { _count: { id: true } }),
       orderBy: by.map((f: string) => ({ [f]: 'asc' as const })),
       take: limit,
+      skip,
     });
 
     return groupResult.map((row: any) => {

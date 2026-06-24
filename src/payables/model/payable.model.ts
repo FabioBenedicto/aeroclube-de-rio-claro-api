@@ -42,4 +42,12 @@ export class Payable {
   employee: Employee | null;
   @Type(() => PayablePayment)
   payments: PayablePayment[];
+
+  flight?: {
+    id: number;
+    type: string;
+    origin: string;
+    destination: string;
+    start_date: Date;
+  } | null;
 }

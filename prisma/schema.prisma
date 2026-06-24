@@ -57,7 +57,6 @@ model PayableType {
 model Settings {
   id                     Int     @id @default(1)
   instructor_percentage  Decimal @default(0) @db.Decimal(5, 2)
-  partner_monthly_dues   Decimal @default(0) @db.Decimal(10, 2)
   glider_initial_minutes Int     @default(45)
   glider_initial_value   Decimal @default(330) @db.Decimal(10, 2)
   glider_minute_value    Decimal @default(3) @db.Decimal(10, 2)
@@ -76,7 +75,7 @@ model SicoobSettings {
   modality            String? @db.VarChar(2)
   cnpj                String? @db.VarChar(14)
   company_name        String? @db.VarChar(30)
-  remittance_sequence Int     @default(0)
+  remittance_sequence Int     @default(1)
   interest_rate       Decimal @default(0) @db.Decimal(5, 2)
   interest_period     Int     @default(0)
   interest_type       String  @default("2") @db.VarChar(1)

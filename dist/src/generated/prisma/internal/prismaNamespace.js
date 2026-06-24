@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defineExtension = exports.JsonNullValueFilter = exports.NullsOrder = exports.QueryMode = exports.JsonNullValueInput = exports.NullableJsonNullValueInput = exports.SortOrder = exports.FileScalarFieldEnum = exports.CnabRemessaScalarFieldEnum = exports.BillScalarFieldEnum = exports.PayablePaymentScalarFieldEnum = exports.PayableScalarFieldEnum = exports.ReceivablePaymentScalarFieldEnum = exports.ReceivableScalarFieldEnum = exports.FlightScalarFieldEnum = exports.AircraftScalarFieldEnum = exports.CompanyScalarFieldEnum = exports.EmployeeScalarFieldEnum = exports.InstructorScalarFieldEnum = exports.PartnerScalarFieldEnum = exports.StudentScalarFieldEnum = exports.AddressScalarFieldEnum = exports.PeopleScalarFieldEnum = exports.UserPermissionScalarFieldEnum = exports.UserAddressScalarFieldEnum = exports.UserScalarFieldEnum = exports.PermissionScalarFieldEnum = exports.SicoobSettingsScalarFieldEnum = exports.SettingsScalarFieldEnum = exports.PayableTypeScalarFieldEnum = exports.ReceivableTypeScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
+exports.defineExtension = exports.JsonNullValueFilter = exports.NullsOrder = exports.QueryMode = exports.JsonNullValueInput = exports.NullableJsonNullValueInput = exports.SortOrder = exports.FileScalarFieldEnum = exports.CnabRemessaScalarFieldEnum = exports.BillScalarFieldEnum = exports.PayablePaymentScalarFieldEnum = exports.PayableScalarFieldEnum = exports.ReceivablePaymentScalarFieldEnum = exports.ReceivableScalarFieldEnum = exports.FlightScalarFieldEnum = exports.AircraftScalarFieldEnum = exports.CompanyScalarFieldEnum = exports.EmployeeScalarFieldEnum = exports.InstructorScalarFieldEnum = exports.PartnerScalarFieldEnum = exports.StudentScalarFieldEnum = exports.AddressScalarFieldEnum = exports.PeopleScalarFieldEnum = exports.UserPermissionScalarFieldEnum = exports.UserScalarFieldEnum = exports.PermissionScalarFieldEnum = exports.SicoobSettingsScalarFieldEnum = exports.SettingsScalarFieldEnum = exports.PayableTypeScalarFieldEnum = exports.ReceivableTypeScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
 const runtime = require("@prisma/client/runtime/client");
 exports.PrismaClientKnownRequestError = runtime.PrismaClientKnownRequestError;
 exports.PrismaClientUnknownRequestError = runtime.PrismaClientUnknownRequestError;
@@ -33,7 +33,6 @@ exports.ModelName = {
     SicoobSettings: 'SicoobSettings',
     Permission: 'Permission',
     User: 'User',
-    UserAddress: 'UserAddress',
     UserPermission: 'UserPermission',
     People: 'People',
     Address: 'Address',
@@ -108,15 +107,6 @@ exports.UserScalarFieldEnum = {
     role: 'role',
     created_at: 'created_at',
     updated_at: 'updated_at'
-};
-exports.UserAddressScalarFieldEnum = {
-    id: 'id',
-    street: 'street',
-    neighborhood: 'neighborhood',
-    city: 'city',
-    state: 'state',
-    zip_code: 'zip_code',
-    user_id: 'user_id'
 };
 exports.UserPermissionScalarFieldEnum = {
     id: 'id',

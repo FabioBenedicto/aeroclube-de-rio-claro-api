@@ -32,6 +32,7 @@ class Flight {
     people;
     instructor;
     receivables;
+    payables;
 }
 exports.Flight = Flight;
 __decorate([

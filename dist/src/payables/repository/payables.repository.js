@@ -29,6 +29,7 @@ const include = {
     instructor: { include: { people: true } },
     partner: { include: { people: true } },
     employee: { include: { people: true } },
+    flight: { select: { id: true, type: true, origin: true, destination: true, start_date: true } },
     payments: {
         orderBy: { payment_date: client_1.Prisma.SortOrder.desc },
         include: { file: true },

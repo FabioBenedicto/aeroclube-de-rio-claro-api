@@ -90,6 +90,8 @@ class QueryReportDto {
     aggregations;
     joins;
     limit;
+    page;
+    offset;
     static _OPENAPI_METADATA_FACTORY() {
         return { entity: { required: true, type: () => String, enum: [
                     'receivable',
@@ -110,7 +112,7 @@ class QueryReportDto {
                     'employee',
                     'cnabRemessa',
                     'file',
-                ] }, columns: { required: false, type: () => [String] }, filters: { required: false, type: () => [require("./query-report.dto").FilterDto] }, groupBy: { required: false, type: () => [String] }, aggregations: { required: false, type: () => [require("./query-report.dto").AggregationDto] }, joins: { required: false, type: () => [String] }, limit: { required: false, type: () => Number, minimum: 1, maximum: 1000 } };
+                ] }, columns: { required: false, type: () => [String] }, filters: { required: false, type: () => [require("./query-report.dto").FilterDto] }, groupBy: { required: false, type: () => [String] }, aggregations: { required: false, type: () => [require("./query-report.dto").AggregationDto] }, joins: { required: false, type: () => [String] }, limit: { required: false, type: () => Number, minimum: 1, maximum: 1000 }, page: { required: false, type: () => Number, minimum: 1 }, offset: { required: false, type: () => Number, minimum: 0 } };
     }
 }
 exports.QueryReportDto = QueryReportDto;
@@ -177,6 +179,18 @@ __decorate([
     (0, class_validator_1.Max)(1000),
     __metadata("design:type", Number)
 ], QueryReportDto.prototype, "limit", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], QueryReportDto.prototype, "page", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], QueryReportDto.prototype, "offset", void 0);
 class RawQueryDto {
     sql;
     static _OPENAPI_METADATA_FACTORY() {

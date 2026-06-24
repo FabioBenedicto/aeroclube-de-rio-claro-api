@@ -9,12 +9,6 @@ export class UpsertSettingsDto {
   @Type(() => Number)
   instructor_percentage?: number;
 
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  @Type(() => Number)
-  partner_monthly_dues?: number;
-
   @IsInt()
   @Min(1)
   @IsOptional()

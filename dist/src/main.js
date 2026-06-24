@@ -6,6 +6,7 @@ const swagger_1 = require("@nestjs/swagger");
 const path_1 = require("path");
 const app_module_1 = require("./app.module");
 const http_exception_filter_1 = require("./common/filters/http-exception.filter");
+const validation_exception_factory_1 = require("./common/validation/validation-exception.factory");
 const prisma_exception_filter_1 = require("./common/filters/prisma-exception.filter");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
@@ -16,6 +17,7 @@ async function bootstrap() {
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
+        exceptionFactory: validation_exception_factory_1.validationExceptionFactory,
     }));
     app.useGlobalInterceptors(new common_1.ClassSerializerInterceptor(app.get(core_1.Reflector)));
     app.useGlobalFilters(new prisma_exception_filter_1.PrismaExceptionFilter(), new http_exception_filter_1.HttpExceptionFilter());

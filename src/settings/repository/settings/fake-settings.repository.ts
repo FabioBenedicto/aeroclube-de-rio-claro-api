@@ -8,7 +8,6 @@ import { ISettingsRepository } from './settings-repository.interface';
 const defaultSettings = {
   id: 1,
   instructor_percentage: 0,
-  partner_monthly_dues: 0,
   glider_initial_minutes: 0,
   glider_initial_value: 0,
   glider_minute_value: 0,

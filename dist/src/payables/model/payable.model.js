@@ -39,6 +39,7 @@ class Payable {
     partner;
     employee;
     payments;
+    flight;
 }
 exports.Payable = Payable;
 __decorate([
